@@ -108,19 +108,20 @@
             <freejoint name="root" />
             <!-- <site name="imu" size="0.01" pos="0 0 0" /> -->
             <geom class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
-            <geom class="body" type="capsule" size="10" fromto="0 0 0 0 0 1" pos="0 0 0" quat="1 0 0 0"/>
+            <geom class="body" type="box" size="43 50 15" pos="15 0 10"/>
+            <geom class="body" type="box" size="10 50 17" pos="48 0 -23"/>
             <inertial mass="0.195" diaginertia="1000 1000 1000" pos="0 0 0"/>
 
             <body name="hip-left" pos="-1.5 -25 -30" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-left" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="capsule" size="10 18" pos="0 0 0" quat="1 0 0 0"/>
+                <geom class="body" type="cylinder" size="22 32" pos="0 -26 0" quat="1 1 0 0"/>
                 <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                 <joint name="hip-left-joint" pos="0 -10 0" axis="1 0 0" range="-0.38 0.42"/>
 
                 <body name="thigh-left" pos="7 -30 5" quat="1 0 -0.25 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-left" pos="0 0 0" quat="1 0 0 0"/>
-                    <geom class="body" type="capsule" size="25 1" pos="0 -3 0" quat="1 0 0 0"/>
+                    <!-- <geom class="body" type="cylinder" size="25 1" pos="0 -3 0" quat="1 0 0 0"/> -->
                     <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                     <joint name="thigh-left-joint" pos="0 0 0" axis="0 -1 0" range="-0.65 1"/>
@@ -137,14 +138,14 @@
 
             <body name="hip-right" pos="-1.5 25 -30" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-right" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="capsule" size="10 18" pos="0 0 0" quat="1 0 0 0"/>
+                <geom class="body" type="cylinder" size="22 32" pos="0 26 0" quat="1 1 0 0"/>
                 <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                 <joint name="hip-right-joint" pos="0 10 0" axis="1 0 0" range="-0.42 0.38"/>
 
                 <body name="thigh-right" pos="7 30 5" quat="1 0 -0.25 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-right" pos="0 0 0" quat="1 0 0 0"/>
-                    <geom class="body" type="capsule" size="25 1" pos="0 3 0" quat="1 0 0 0"/>
+                    <!-- <geom class="body" type="cylinder" size="25 1" pos="0 3 0" quat="1 0 0 0"/> -->
                     <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                     <joint name="thigh-right-joint" pos="0 0 0" axis="0 1 0" range="-1 0.65"/>
