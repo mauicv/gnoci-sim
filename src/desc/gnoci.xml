@@ -106,7 +106,7 @@
         />
         <body name="root" pos="0 0 200" quat="1 0 0 0">
             <freejoint name="root" />
-            <!-- <site name="imu" size="0.01" pos="0 0 0" /> -->
+            <site name="imu" size="0.01" pos="0 0 0" />
             <geom class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
             <geom class="body" type="box" size="43 50 15" pos="15 0 10"/>
             <geom class="body" type="box" size="10 50 17" pos="48 0 -23"/>
@@ -163,23 +163,35 @@
     </worldbody>
 
     <actuator>
-        <position name="servo_hip_left" joint="hip-left-joint"/>
-        <position name="servo_hip_right" joint="hip-right-joint"/>
-        <position name="servo_thigh_left" joint="thigh-left-joint"/>
-        <position name="servo_thigh_right" joint="thigh-right-joint"/>
-        <position name="servo_lower_leg_left" joint="lower-leg-left-joint"/>
-        <position name="servo_lower_leg_right" joint="lower-leg-right-joint"/>
+        <position name="servo-hip-left" joint="hip-left-joint"/>
+        <position name="servo-hip-right" joint="hip-right-joint"/>
+        <position name="servo-thigh-left" joint="thigh-left-joint"/>
+        <position name="servo-thigh-right" joint="thigh-right-joint"/>
+        <position name="servo-lower-leg-left" joint="lower-leg-left-joint"/>
+        <position name="servo-lower-leg-right" joint="lower-leg-right-joint"/>
     </actuator>
 
     <sensor>
-        <actuatorfrc name="hipL_tau" actuator="servo_hip_left"/>
-        <actuatorfrc name="kneeL_tau" actuator="servo_lower_leg_left"/>
-        <!-- <actuatorpos name="lb_joint1_p" actuator="lb_joint1" />
-        <actuatorvel name="lb_joint1_v" actuator="lb_joint1" />
-        <actuatorpos name="lb_joint2_p" actuator="lb_joint2" /> -->
+        <actuatorpos name="hip-left-servo-pos" actuator="servo-hip-left" />
+        <actuatorvel name="hip-left-servo-vel" actuator="servo-hip-left" />
 
-        <!-- <gyro name="accel" site="imu" noise="0.005" cutoff="34.9" />
-        <accelerometer name="gyro" site="imu" noise="0.01" cutoff="40"/> -->
+        <actuatorpos name="thigh-left-servo-pos" actuator="servo-thigh-left" />
+        <actuatorvel name="thigh-left-servo-vel" actuator="servo-thigh-left" />
+
+        <actuatorpos name="lower-leg-left-servo-pos" actuator="servo-lower-leg-left" />
+        <actuatorvel name="lower-leg-left-servo-vel" actuator="servo-lower-leg-left" />
+
+        <actuatorpos name="hip-right-servo-pos" actuator="servo-hip-right" />
+        <actuatorvel name="hip-right-servo-vel" actuator="servo-hip-right" />
+        
+        <actuatorpos name="thigh-right-servo-pos" actuator="servo-thigh-right" />
+        <actuatorvel name="thigh-right-servo-vel" actuator="servo-thigh-right" />
+
+        <actuatorpos name="lower-leg-right-servo-pos" actuator="servo-lower-leg-right" />
+        <actuatorvel name="lower-leg-right-servo-vel" actuator="servo-lower-leg-right" />
+
+        <gyro name="gyro" site="imu" noise="0.005" cutoff="34.9" />
+        <accelerometer name="accel" site="imu" noise="0.01" cutoff="40"/>
 
     </sensor>
 </mujoco>
