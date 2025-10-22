@@ -26,6 +26,4 @@ env.reset()
 
 ```
 
-to get:
-
-![assets/animation.gif]
+![](assets/animation.gif)
