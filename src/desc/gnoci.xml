@@ -12,14 +12,14 @@
         />
         <!-- <geom condim="4" contype="1" conaffinity="15" friction="0.9 0.2 0.2" solref="0.001 2" /> -->
         <position 
-            kp="2500"
+            kp="500000"
             dampratio="1"
             forcelimited="true"
             forcerange="-120000 120000"
-            gear="10"
-            ctrllimited="true"
-            ctrlrange="-10 10"
         />
+        <!-- gear="10"
+        ctrllimited="true"
+        ctrlrange="-10 10" -->
         <!-- <equality solref="0.001 2" /> -->
         <default class="visualgeom">
             <geom 
@@ -71,11 +71,11 @@
         />
         <material
             name="visualgeom"
-            rgba="1 1 1 0.5"
+            rgba="1 1 1 1"
         />
         <material
             name="body"
-            rgba="0.5 0.9 0.2 1"
+            rgba="0.5 0.9 0.2 0.25"
         />
     </asset>
 
@@ -121,7 +121,6 @@
 
                 <body name="thigh-left" pos="7 -30 5" quat="1 0 -0.25 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-left" pos="0 0 0" quat="1 0 0 0"/>
-                    <!-- <geom class="body" type="cylinder" size="25 1" pos="0 -3 0" quat="1 0 0 0"/> -->
                     <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                     <joint name="thigh-left-joint" pos="0 0 0" axis="0 -1 0" range="-0.65 1"/>
@@ -145,7 +144,6 @@
 
                 <body name="thigh-right" pos="7 30 5" quat="1 0 -0.25 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-right" pos="0 0 0" quat="1 0 0 0"/>
-                    <!-- <geom class="body" type="cylinder" size="25 1" pos="0 3 0" quat="1 0 0 0"/> -->
                     <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
 
                     <joint name="thigh-right-joint" pos="0 0 0" axis="0 1 0" range="-1 0.65"/>
@@ -163,12 +161,12 @@
     </worldbody>
 
     <actuator>
-        <position name="servo-hip-left" joint="hip-left-joint"/>
-        <position name="servo-hip-right" joint="hip-right-joint"/>
-        <position name="servo-thigh-left" joint="thigh-left-joint"/>
-        <position name="servo-thigh-right" joint="thigh-right-joint"/>
-        <position name="servo-lower-leg-left" joint="lower-leg-left-joint"/>
-        <position name="servo-lower-leg-right" joint="lower-leg-right-joint"/>
+        <position name="servo-hip-left" joint="hip-left-joint" inheritrange="1"/>
+        <position name="servo-hip-right" joint="hip-right-joint" inheritrange="1"/>
+        <position name="servo-thigh-left" joint="thigh-left-joint" inheritrange="1"/>
+        <position name="servo-thigh-right" joint="thigh-right-joint" inheritrange="1"/>
+        <position name="servo-lower-leg-left" joint="lower-leg-left-joint" inheritrange="1"/>
+        <position name="servo-lower-leg-right" joint="lower-leg-right-joint" inheritrange="1"/>
     </actuator>
 
     <sensor>

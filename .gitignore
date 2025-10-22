@@ -1,2 +1,7 @@
 venv
 .DS_Store
+animation.gif
+MUJOCO_LOG.TXT
+test.png
+__pycache__/
+gnoci_gym.egg-info/

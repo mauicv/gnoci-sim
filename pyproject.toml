@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gnoci-gym"
+authors = [
+    {name = "Alex Athorne", email = "alexander.athorne@gmail.com"},
+]
+description = "Gym env for training a the gnoci robot"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["robotics", "control", "experiments", "rl"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "gymnasium",
+    "mujoco",
+    "filterpy",
+    "simple-pid"
+]
+dynamic = ["version"]
+
+[tool.setuptools.package-data]
+puppypi_gym = ["src/desc/*.xml", "src/desc/meshes/*.stl"]
