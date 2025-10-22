@@ -48,7 +48,7 @@ for i in tqdm(range(100)):
 
 env.reset()
 
-imageio.mimsave('animation.gif', frames, fps=30)
+imageio.mimsave('assets/animation.gif', frames, loop=0, fps=30)
 
 actions = np.array(actions)
 responses = np.array(responses)
