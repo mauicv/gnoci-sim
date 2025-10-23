@@ -26,6 +26,7 @@ class GnociGymEnv(gym.Env):
         self.env_rate = env_rate
         self.system_rate = system_rate
         self.control_rate = control_rate
+        self.done = False
 
         package_dir = os.path.dirname(os.path.abspath(__file__))
         xml_path = os.path.join(package_dir, 'desc', 'gnoci.xml')
@@ -75,7 +76,6 @@ class GnociGymEnv(gym.Env):
             actuator_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
             servo_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name)
             pin_limits=(self.model.actuator_ctrlrange[servo_id][0], self.model.actuator_ctrlrange[servo_id][1])
-            print(servo_id, actuator_name, pin_limits)
             servo = Servo(
                 name=actuator_name,
                 pin_id=0,
@@ -91,6 +91,7 @@ class GnociGymEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         self.cf.reset()
         self.kalman_filter.reset()
+        self.done = False
         return self._get_obs(), {}
 
     def _get_gyro_data(self):
@@ -139,7 +140,6 @@ class GnociGymEnv(gym.Env):
     def _get_info(self):
         return {}
 
-    
     def _get_reward(self, state, overturn_flag):
         return compute_reward(state, overturn_flag)
 
@@ -160,8 +160,9 @@ class GnociGymEnv(gym.Env):
         overturn_flag = self._detect_overturn()
         state = self._get_obs()
         reward = self._get_reward(state, overturn_flag)
-
-        return (state, reward, overturn_flag, {})
+        if overturn_flag:
+            self.done = True
+        return (state, reward, self.done, {})
     
     def render(self):
         with mujoco.Renderer(self.model) as renderer:

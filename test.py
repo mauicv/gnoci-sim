@@ -31,6 +31,7 @@ for i in tqdm(range(100)):
     #     np.sin(a), -np.sin(a), np.sin(a), -np.sin(a)
     # ])
     action = np.random.uniform(-1, 1, 6)
+    # action = np.array([0,0,0,0,0,0])
     state, reward, done, _ = env.step(action)
     body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")
     xmat = env.unwrapped.data.xmat[body_id]

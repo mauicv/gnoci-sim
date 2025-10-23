@@ -1,7 +1,7 @@
 import numpy as np
 
 # TODO: These values are not correct, they need to be tuned.
-flbt, frbt, brbt, blbt, fltt, frtt, brtt, bltt = [0.3, 0.3, 0.3, 0.3, -0.3, -0.3, -0.3, -0.3]
+flbt, frbt, brbt, blbt, fltt, frtt, brtt, bltt = [0, 0, 0, 0, 0, 0, 0, 0]
 
 
 def sigmoid(z):
