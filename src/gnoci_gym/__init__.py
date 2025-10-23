@@ -4,8 +4,9 @@ import numpy as np
 import os
 from .filters import ComplementaryFilter, KalmanMPU6050Filter
 from .servo import Servo
-from .reward import compute_reward
+from .utils import tolerance
 
+_STANDING_HEIGHT = 145
 
 generic_values = {
     "kp": 0.08,
@@ -87,6 +88,12 @@ class GnociGymEnv(gym.Env):
             )
             self.servos.append(servo)
 
+        self.body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            "root"
+        )
+
     def reset(self, seed=None, **kwargs):
         mujoco.mj_resetData(self.model, self.data)
         self.cf.reset()
@@ -106,17 +113,6 @@ class GnociGymEnv(gym.Env):
     def _get_motor_velocities(self):
         return self.data.sensordata[self.motor_velocities_sensor_ids]
 
-    def _detect_overturn(self):
-        body_id = mujoco.mj_name2id(
-            self.model,
-            mujoco.mjtObj.mjOBJ_BODY,
-            "root"
-        )
-        xmat = self.data.xmat[body_id]
-        z_axis = np.array([xmat[6], xmat[7], xmat[8]])
-        dot = np.dot(z_axis, [0, 0, 1])
-        is_flipped = dot < 0
-        return is_flipped
 
     def _get_obs(self):
         raw_imu_data = [
@@ -140,8 +136,29 @@ class GnociGymEnv(gym.Env):
     def _get_info(self):
         return {}
 
-    def _get_reward(self, state, overturn_flag):
-        return compute_reward(state, overturn_flag)
+    def overturned(self):
+        return self._get_root_upright() < 0
+
+    def _get_root_upright(self):
+        xmat = self.data.xmat[self.body_id]
+        z_axis = np.array([xmat[6], xmat[7], xmat[8]])
+        dot = np.dot(z_axis, [0, 0, 1])
+        return dot
+
+    def _get_root_height(self):
+        _, _, height = self.data.xpos[self.body_id]
+        return height
+
+    def _get_reward(self):
+        upright, height = self._get_root_upright(), self._get_root_height()
+        standing = tolerance(
+            height,
+            bounds=(_STANDING_HEIGHT, float('inf')),
+            margin=_STANDING_HEIGHT/2
+        )
+        upright = (1 + upright) / 2
+        stand_reward = (3*standing + upright) / 4
+        return stand_reward
 
     def step(self, action):
         action = action.clip(-1, 1)
@@ -157,10 +174,9 @@ class GnociGymEnv(gym.Env):
                     servo_pos = servo.update()
                     self.data.ctrl[servo.pin] = servo_pos
 
-        overturn_flag = self._detect_overturn()
         state = self._get_obs()
-        reward = self._get_reward(state, overturn_flag)
-        if overturn_flag:
+        reward = self._get_reward()
+        if self.overturned():
             self.done = True
         return (state, reward, self.done, self.done, {})
     

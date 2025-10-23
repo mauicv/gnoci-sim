@@ -20,16 +20,14 @@ times = []
 actions = []
 control = []
 responses = []
-horizontal_state = []
 dones = []
 frames = []
 rewards = []
+
+horizontal_state = []
+standing_height = []
+
 for i in tqdm(range(100)):
-    # a = 2*(2*np.pi*i)/100
-    # action = np.array([
-    #     np.sin(a), -np.sin(a), np.sin(a), -np.sin(a),
-    #     np.sin(a), -np.sin(a), np.sin(a), -np.sin(a)
-    # ])
     action = np.random.uniform(-1, 1, 6)
     # action = np.array([0,0,0,0,0,0])
     state, reward, done, truncated, _ = env.step(action)
@@ -37,9 +35,11 @@ for i in tqdm(range(100)):
     xmat = env.unwrapped.data.xmat[body_id]
     z_axis = np.array([xmat[6], xmat[7], xmat[8]])
     dot = np.dot(z_axis, [0, 0, 1])
+    xpos = env.unwrapped.data.xpos[body_id]
+    horizontal_state.append(dot)
+    standing_height.append(xpos[2])
 
     times.append(env.unwrapped.data.time)
-    horizontal_state.append(dot)
     dones.append(int(done))
     actions.append(action)
     control.append(env.unwrapped.data.ctrl)
@@ -57,7 +57,7 @@ dones = np.array(dones)
 rewards = np.array(rewards)
 control = np.array(control)
 
-fig, axs = plt.subplots(nrows=2, ncols=4)
+fig, axs = plt.subplots(nrows=3, ncols=4)
 for i in range(3):
     for j in range(2):
         axs[j, i].plot(times, actions[:, 3*j + i], label='action')
@@ -66,8 +66,12 @@ for i in range(3):
         axs[j, i].plot(times, responses[:, 6 + 3*j + i], label='velocity')
         axs[j, i].legend()
 
-axs[0, 3].plot(dones, label='done')
+for i in range(3):
+    axs[2, i].plot(times,responses[:, 20-3 + i])
+
+axs[0, 3].plot(standing_height, label='standing_height')
+axs[0, 3].plot(horizontal_state, label='horizontal_state')
 axs[0, 3].legend()
-axs[1, 3].plot(rewards, label='reward')
+axs[1, 3].plot(times, rewards, label='reward')
 axs[1, 3].legend()
 plt.savefig('test.png')

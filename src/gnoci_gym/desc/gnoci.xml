@@ -102,7 +102,7 @@
         <body name="root" pos="0 0 153" quat="1 0 0 0">
             <freejoint name="root" />
             <site name="imu" size="0.01" pos="0 0 0" />
-            <geom class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
+            <geom name="root" class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
             <geom class="body" type="box" size="43 50 15" pos="15 0 10"/>
             <geom class="body" type="box" size="10 50 17" pos="48 0 -23"/>
             <inertial mass="0.195" diaginertia="1000 1000 1000" pos="0 0 0"/>
