@@ -93,19 +93,19 @@ class GnociGymEnv(gym.Env):
             mujoco.mjtObj.mjOBJ_BODY,
             "root"
         )
-        self._randomize_joint_positions()
 
-    def _randomize_joint_positions(self):
+    def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
             joint_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
             if joint_name == 'root':
                 continue
             range_min, range_max = self.model.jnt_range[joint_id]
-            self.data.qpos[joint_id] = np.random.uniform(range_min, range_max)
+            adr = self.model.jnt_qposadr[joint_id]
+            self.data.qpos[adr] = np.clip(np.random.normal(0, randomness), range_min, range_max)
 
-    def reset(self, seed=None, **kwargs):
+    def reset(self, seed=None, randomness=0.6, **kwargs):
         mujoco.mj_resetData(self.model, self.data)
-        self._randomize_joint_positions()
+        self._randomize_joint_positions(randomness=randomness)
         self.cf.reset()
         self.kalman_filter.reset()
         self.done = False

@@ -12,7 +12,12 @@ gym.register(
     entry_point=GnociGymEnv,
 )
 
-env = gym.make("gnoci_gym/Gnoci-v0")
+env = gym.make(
+    "gnoci_gym/Gnoci-v0",
+    env_rate=0.005,
+    system_rate=0.005,
+    control_rate=0.01
+)
 
 state, *_ = env.reset(seed=0)
 
@@ -29,7 +34,7 @@ standing_height = []
 
 for i in tqdm(range(100)):
     action = np.random.uniform(-1, 1, 6)
-    # action = np.array([0,0,0,0,0,0])
+    action = np.array([0,0,0,0,0,0])
     state, reward, done, truncated, _ = env.step(action)
     body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")
     xmat = env.unwrapped.data.xmat[body_id]
@@ -47,7 +52,6 @@ for i in tqdm(range(100)):
     rewards.append(reward)
     frames.append(env.render())
 
-env.reset()
 
 imageio.mimsave('assets/animation.gif', frames, loop=0, fps=30)
 
