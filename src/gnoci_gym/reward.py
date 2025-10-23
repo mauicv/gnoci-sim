@@ -44,7 +44,7 @@ def compute_posture_reward(state):
 def compute_reward(state, overturn_flag):
     posture_reward = compute_posture_reward(state)
     if overturn_flag:
-        reward = 0
+        reward = -1
     else:
         reward = posture_reward
     return reward
