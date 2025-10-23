@@ -20,7 +20,7 @@ state, *_ = env.reset(seed=0)
 
 for i in tqdm(range(100)):
     action = np.random.uniform(-1, 1, 6)
-    state, reward, done, _ = env.step(action)
+    state, reward, done, truncated, _ = env.step(action)
 
 env.reset()
 

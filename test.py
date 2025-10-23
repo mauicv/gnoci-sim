@@ -32,7 +32,7 @@ for i in tqdm(range(100)):
     # ])
     action = np.random.uniform(-1, 1, 6)
     # action = np.array([0,0,0,0,0,0])
-    state, reward, done, _ = env.step(action)
+    state, reward, done, truncated, _ = env.step(action)
     body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")
     xmat = env.unwrapped.data.xmat[body_id]
     z_axis = np.array([xmat[6], xmat[7], xmat[8]])
@@ -63,7 +63,7 @@ for i in range(3):
         axs[j, i].plot(times, actions[:, 3*j + i], label='action')
         axs[j, i].plot(times, control[:, 3*j + i], label='control')
         axs[j, i].plot(times, responses[:, 3*j + i], label='position')
-        # axs[j, i].plot(times, 100*responses[:, 6 + 3*j + i], label='velocity')
+        axs[j, i].plot(times, responses[:, 6 + 3*j + i], label='velocity')
         axs[j, i].legend()
 
 axs[0, 3].plot(dones, label='done')

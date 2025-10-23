@@ -45,7 +45,7 @@ class GnociGymEnv(gym.Env):
         )
 
         self.action_space = gym.spaces.Box(
-            -1, 1, shape=(8,), dtype=np.float32
+            -1, 1, shape=(6,), dtype=np.float32
         )
 
         self.gyro_sensor_id = self.model.sensor('gyro').id
@@ -162,7 +162,7 @@ class GnociGymEnv(gym.Env):
         reward = self._get_reward(state, overturn_flag)
         if overturn_flag:
             self.done = True
-        return (state, reward, self.done, {})
+        return (state, reward, self.done, self.done, {})
     
     def render(self):
         with mujoco.Renderer(self.model) as renderer:
