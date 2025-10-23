@@ -1,4 +1,4 @@
-from src import GnociGymEnv
+from gnoci_gym import GnociGymEnv
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
