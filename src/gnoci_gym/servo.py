@@ -28,6 +28,7 @@ class Servo:
             starting_output=0,
             setpoint=self.init_value,
         )
+        self.pid_controller.sample_time = 0.02
 
     def update_setpoint_delta(self, setpoint_delta: float):
         updated_setpoint = self.pid_controller.setpoint + setpoint_delta
