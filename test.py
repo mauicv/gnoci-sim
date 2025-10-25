@@ -34,7 +34,7 @@ standing_height = []
 
 for i in tqdm(range(100)):
     action = np.random.uniform(-1, 1, 6)
-    action = np.array([0,0,0,0,0,0])
+    # action = np.array([1,1,1,1,1,1])
     state, reward, done, truncated, _ = env.step(action)
     body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")
     xmat = env.unwrapped.data.xmat[body_id]
@@ -47,7 +47,7 @@ for i in tqdm(range(100)):
     times.append(env.unwrapped.data.time)
     dones.append(int(done))
     actions.append(action)
-    control.append(env.unwrapped.data.ctrl)
+    control.append(env.unwrapped.data.ctrl.copy())
     responses.append(state)
     rewards.append(reward)
     frames.append(env.render())
@@ -61,21 +61,31 @@ dones = np.array(dones)
 rewards = np.array(rewards)
 control = np.array(control)
 
-fig, axs = plt.subplots(nrows=3, ncols=4)
-for i in range(3):
-    for j in range(2):
-        axs[j, i].plot(times, actions[:, 3*j + i], label='action')
-        axs[j, i].plot(times, control[:, 3*j + i], label='control')
-        axs[j, i].plot(times, responses[:, 3*j + i], label='position')
-        axs[j, i].plot(times, responses[:, 6 + 3*j + i], label='velocity')
-        axs[j, i].legend()
+fig, axs = plt.subplots(nrows=4, ncols=6)
+for j in range(6):
+    axs[0, j].plot(times, actions[:, j], label='action')
+    axs[0, j].legend()
 
-for i in range(3):
-    axs[2, i].plot(times,responses[:, 20-3 + i])
 
-axs[0, 3].plot(standing_height, label='standing_height')
-axs[0, 3].plot(horizontal_state, label='horizontal_state')
-axs[0, 3].legend()
-axs[1, 3].plot(times, rewards, label='reward')
-axs[1, 3].legend()
+for j in range(6):
+    axs[1, j].plot(times, control[:, j], label='control')
+    axs[1, j].legend()
+
+
+for j in range(6):
+    axs[2, j].plot(times, responses[:, j], label='position')
+    axs[2, j].legend()
+
+for j in range(6):
+    axs[3, j].plot(times, responses[:, 6 + j], label='velocity')
+    axs[3, j].legend()
+
+# for i in range(3):
+#     axs[2, i].plot(times,responses[:, 20-3 + i])
+
+# axs[0, 3].plot(standing_height, label='standing_height')
+# axs[0, 3].plot(horizontal_state, label='horizontal_state')
+# axs[0, 3].legend()
+# axs[1, 3].plot(times, rewards, label='reward')
+# axs[1, 3].legend()
 plt.savefig('test.png')

@@ -9,21 +9,28 @@ from .utils import tolerance
 _STANDING_HEIGHT = 145
 
 generic_values = {
-    "kp": 0.08,
-    "ki": 0.01,
-    "kd": 0.005,
+    "kp": 0.35,
+    "ki": 0.0,
+    "kd": 0.05,
 }
 
 
 class GnociGymEnv(gym.Env):
+    metadata = {
+        'render_modes': ['rgb_array'],
+        'render_fps': 30,
+    }
+    
     def __init__(
             self,
             env_rate=0.005,
             system_rate=0.01,
             control_rate=0.05,
-            camera='track'
+            camera='track',
+            render_mode='rgb_array'
         ):
         self.camera = camera
+        self.render_mode = render_mode
         self.env_rate = env_rate
         self.system_rate = system_rate
         self.control_rate = control_rate
@@ -190,8 +197,11 @@ class GnociGymEnv(gym.Env):
             self.done = True
         return (state, reward, self.done, self.done, {})
     
-    def render(self):
-        with mujoco.Renderer(self.model) as renderer:
-            renderer.update_scene(self.data, camera=self.camera)
-            pixels = renderer.render()
-            return pixels
+    def render(self, mode='rgb_array'):
+        if mode == 'rgb_array':
+            with mujoco.Renderer(self.model) as renderer:
+                renderer.update_scene(self.data, camera=self.camera)
+                pixels = renderer.render()
+                return pixels
+        else:
+            raise ValueError(f"Invalid render mode: {mode}")
