@@ -16,7 +16,7 @@ env = gym.make(
     "gnoci_gym/Gnoci-v0",
     env_rate=0.005,
     system_rate=0.005,
-    control_rate=0.01
+    control_rate=0.01,
 )
 
 state, *_ = env.reset(seed=0)
