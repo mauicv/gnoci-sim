@@ -26,6 +26,6 @@ env.reset()
 
 ```
 
-![](assets/animation.gif)
+![](assets/animation-complex.gif)
 
 See also [this](https://colab.research.google.com/drive/13MDYzpxYmWT-9RKIIiF1CMuo6QNOUCGv?authuser=1) notebook

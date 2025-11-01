@@ -1,6 +1,6 @@
 venv
 .DS_Store
 MUJOCO_LOG.TXT
-test.png
+test*.png
 __pycache__/
 gnoci_gym.egg-info/

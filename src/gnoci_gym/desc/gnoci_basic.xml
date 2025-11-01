@@ -1,0 +1,165 @@
+<mujoco model="gnoci">
+    <option timestep="0.005" gravity="0 0 -9810"/>
+    <compiler angle="radian" meshdir="meshes" eulerseq="zyx" autolimits="true"/>
+
+
+    <default>
+        <joint
+            limited="true"
+            damping="0.01"
+            armature="0.01"
+            frictionloss="0.01"
+        />
+        <position 
+            kp="250000"
+            dampratio="0.5"
+            forcelimited="true"
+            forcerange="-5000000 5000000"
+        />
+        <motor 
+            ctrlrange="-1 1"
+            gear="1000000"
+        />
+        <default class="visualgeom">
+            <geom 
+                material="visualgeom"
+                condim="1"
+                contype="0"
+                conaffinity="0"
+            />
+        </default>
+
+        <default class="body">
+            <geom
+                material="body"
+                condim="1"
+                friction=".7"
+                solimp=".9 .99 .003"
+                solref=".015 1"
+            />
+        </default>
+    </default>
+
+    <asset>
+        <mesh name="body-main" content_type="model/stl" file="body-main.stl" />
+        <mesh name="hip-left" content_type="model/stl" file="hip-left.stl" />
+        <mesh name="hip-right" content_type="model/stl" file="hip-right.stl" />
+        <mesh name="thigh-left" content_type="model/stl" file="thigh-left.stl" />
+        <mesh name="thigh-right" content_type="model/stl" file="thigh-right.stl" />
+        <mesh name="lower-leg-left" content_type="model/stl" file="lower-leg-left.stl" />
+        <mesh 
+            name="lower-leg-right"
+            content_type="model/stl"
+            file="lower-leg-right.stl"
+        />
+        <texture builtin="checker" height="100" name="texplane" rgb1="0 0 0" rgb2="0.8 0.8 0.8" type="2d" width="100"/>
+        <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texplane"/>
+        <material
+            name="visualgeom"
+            rgba="1 1 1 1"
+        />
+        <material
+            name="body"
+            rgba="0.5 0.9 0.2 0"
+        />
+    </asset>
+
+    <worldbody>
+        <light
+            directional="true"
+            diffuse="0.4 0.4 0.4"
+            specular="0.1 0.1 0.1"
+            pos="0 0 15.0"
+            dir="0 0 -1"
+            castshadow="false"
+        />
+        <geom condim="3" friction="1 .1 .1" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="1000 1000 0.125" type="plane"/>
+        <camera
+            name="track"
+            mode="trackcom"
+            pos="-250. -250. 375."
+            xyaxes="0.7071 -0.7071 0 0.4082 0.4082 0.8165"
+        />
+        <body name="root" pos="0 0 153" quat="1 0 0 0">
+            <freejoint name="root" />
+            <site name="imu" size="0.01" pos="0 0 0" />
+            <geom name="root" class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
+            <geom class="body" type="box" size="43 50 15" pos="15 0 10"/>
+            <geom class="body" type="box" size="10 50 17" pos="48 0 -23"/>
+            <inertial mass="0.195" diaginertia="1000 1000 1000" pos="0 0 0"/>
+
+            <body name="hip-left" pos="-1.5 -25 -30" quat="1 0 0 0">
+                <geom class="visualgeom" type="mesh" mesh="hip-left" pos="0 0 0" quat="1 0 0 0"/>
+                <geom class="body" type="cylinder" size="22 32" pos="0 -26 0" quat="1 1 0 0"/>
+                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                <joint name="hip-left-joint" pos="0 -10 0" axis="1 0 0" range="-0.38 0.42"/>
+
+                <body name="thigh-left" pos="7 -30 5" quat="1 0 -0.38 0">
+                    <geom class="visualgeom" type="mesh" mesh="thigh-left" pos="0 0 0" quat="1 0 0 0"/>
+                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <joint name="thigh-left-joint" pos="0 0 0" axis="0 -1 0" range="-0.65 1"/>
+
+                    <body name="lower-leg-left" pos="0 -12 -62" quat="1 0 0.75 0">
+                        <geom class="visualgeom" type="mesh" mesh="lower-leg-left" pos="0 0 0" quat="1 0 0 0"/>
+                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 -5 -85" pos="0 0 0" quat="1 0 0 0"/>
+                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <joint name="lower-leg-left-joint" pos="0 0 0" axis="0 -1 0" range="-1.15 0.3"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="hip-right" pos="-1.5 25 -30" quat="1 0 0 0">
+                <geom class="visualgeom" type="mesh" mesh="hip-right" pos="0 0 0" quat="1 0 0 0"/>
+                <geom class="body" type="cylinder" size="22 32" pos="0 26 0" quat="1 1 0 0"/>
+                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                <joint name="hip-right-joint" pos="0 10 0" axis="1 0 0" range="-0.42 0.38"/>
+
+                <body name="thigh-right" pos="7 30 5" quat="1 0 -0.38 0">
+                    <geom class="visualgeom" type="mesh" mesh="thigh-right" pos="0 0 0" quat="1 0 0 0"/>
+                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <joint name="thigh-right-joint" pos="0 0 0" axis="0 1 0" range="-1 0.65"/>
+
+                    <body name="lower-leg-right" pos="0 12 -62" quat="1 0 0.75 0">
+                        <geom class="visualgeom" type="mesh" mesh="lower-leg-right" pos="0 0 0" quat="1 0 0 0"/>
+                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 5 -85" pos="0 0 0" quat="1 0 0 0"/>
+                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <joint name="lower-leg-right-joint" pos="0 0 0" axis="0 1 0" range="-0.3 1.15"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <motor name="servo-hip-left" joint="hip-left-joint"/>
+        <motor name="servo-hip-right" joint="hip-right-joint"/>
+        <motor name="servo-thigh-left" joint="thigh-left-joint"/>
+        <motor name="servo-thigh-right" joint="thigh-right-joint"/>
+        <motor name="servo-lower-leg-left" joint="lower-leg-left-joint"/>
+        <motor name="servo-lower-leg-right" joint="lower-leg-right-joint"/>
+    </actuator>
+
+    <sensor>
+        <actuatorpos name="hip-left-servo-pos" actuator="servo-hip-left" />
+        <actuatorvel name="hip-left-servo-vel" actuator="servo-hip-left" />
+
+        <actuatorpos name="thigh-left-servo-pos" actuator="servo-thigh-left" />
+        <actuatorvel name="thigh-left-servo-vel" actuator="servo-thigh-left" />
+
+        <actuatorpos name="lower-leg-left-servo-pos" actuator="servo-lower-leg-left" />
+        <actuatorvel name="lower-leg-left-servo-vel" actuator="servo-lower-leg-left" />
+
+        <actuatorpos name="hip-right-servo-pos" actuator="servo-hip-right" />
+        <actuatorvel name="hip-right-servo-vel" actuator="servo-hip-right" />
+        
+        <actuatorpos name="thigh-right-servo-pos" actuator="servo-thigh-right" />
+        <actuatorvel name="thigh-right-servo-vel" actuator="servo-thigh-right" />
+
+        <actuatorpos name="lower-leg-right-servo-pos" actuator="servo-lower-leg-right" />
+        <actuatorvel name="lower-leg-right-servo-vel" actuator="servo-lower-leg-right" />
+
+        <gyro name="gyro" site="imu" noise="0.005" cutoff="34.9" />
+        <accelerometer name="accel" site="imu" noise="0.01" cutoff="40"/>
+
+    </sensor>
+</mujoco>

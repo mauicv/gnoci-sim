@@ -1,4 +1,4 @@
-from gnoci_gym import GnociGymEnv
+from gnoci_gym import BasicGnociGymEnv
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
@@ -9,14 +9,13 @@ import mujoco
 
 gym.register(
     id="gnoci_gym/Gnoci-v0",
-    entry_point=GnociGymEnv,
+    entry_point=BasicGnociGymEnv,
 )
 
 env = gym.make(
     "gnoci_gym/Gnoci-v0",
     env_rate=0.005,
-    system_rate=0.005,
-    control_rate=0.01,
+    initial_randomness=0.6,
 )
 
 state, *_ = env.reset(seed=0)
@@ -53,7 +52,7 @@ for i in tqdm(range(100)):
     frames.append(env.render())
 
 
-imageio.mimsave('assets/animation.gif', frames, loop=0, fps=30)
+imageio.mimsave('assets/animation-basic.gif', frames, loop=0, fps=30)
 
 actions = np.array(actions)
 responses = np.array(responses)
@@ -88,4 +87,4 @@ for j in range(6):
 # axs[0, 3].legend()
 # axs[1, 3].plot(times, rewards, label='reward')
 # axs[1, 3].legend()
-plt.savefig('test.png')
+plt.savefig('test_basic.png')

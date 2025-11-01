@@ -1,0 +1,176 @@
+import mujoco
+import gymnasium as gym
+import numpy as np
+import os
+from .utils import tolerance
+
+_STANDING_HEIGHT = 145
+
+generic_values = {
+    "kp": 0.35,
+    "ki": 0.0,
+    "kd": 0.05,
+}
+
+
+class BasicGnociGymEnv(gym.Env):
+    metadata = {
+        'render_modes': ['rgb_array'],
+        'render_fps': 30,
+    }
+    
+    def __init__(
+            self,
+            camera='track',
+            render_mode='rgb_array',
+            env_rate=0.005,
+            initial_randomness=0.6,
+        ):
+        self.camera = camera
+        self.render_mode = render_mode
+        self.done = False
+        self.env_rate = env_rate
+        self.initial_randomness = initial_randomness
+        
+        package_dir = os.path.dirname(os.path.abspath(__file__))
+        xml_path = os.path.join(package_dir, 'desc', 'gnoci_basic.xml')
+        
+        self.model = mujoco.MjModel.from_xml_path(xml_path)
+        self.data = mujoco.MjData(self.model)
+        self.model.opt.timestep = self.env_rate
+        self.observation_space = gym.spaces.Box(
+            -np.inf,
+            np.inf,
+            shape=(18 + 1,),
+            dtype=np.float32
+        )
+
+        self.action_space = gym.spaces.Box(
+            -1, 1, shape=(6,), dtype=np.float32
+        )
+
+        self.gyro_sensor_id = self.model.sensor('gyro').id
+        self.accel_sensor_id = self.model.sensor('accel').id
+
+        self.motor_positions_sensor_ids = [
+            self.model.sensor('hip-left-servo-pos').id,
+            self.model.sensor('thigh-left-servo-pos').id,
+            self.model.sensor('lower-leg-left-servo-pos').id,
+            self.model.sensor('hip-right-servo-pos').id,
+            self.model.sensor('thigh-right-servo-pos').id,
+            self.model.sensor('lower-leg-right-servo-pos').id,
+        ]
+
+        self.motor_velocities_sensor_ids = [
+            self.model.sensor('hip-left-servo-vel').id,
+            self.model.sensor('thigh-left-servo-vel').id,
+            self.model.sensor('lower-leg-left-servo-vel').id,
+            self.model.sensor('hip-right-servo-vel').id,
+            self.model.sensor('thigh-right-servo-vel').id,
+            self.model.sensor('lower-leg-right-servo-vel').id,
+        ]
+
+        self.servos = []
+        for servo_id in range(self.model.nu):
+            if mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, servo_id) == 'root':
+                continue
+            self.servos.append(servo_id)
+
+        self.body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            "root"
+        )
+
+    def _randomize_joint_positions(self, randomness):
+        for joint_id in range(self.model.njnt):
+            joint_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+            if joint_name == 'root':
+                continue
+            range_min, range_max = self.model.jnt_range[joint_id]
+            adr = self.model.jnt_qposadr[joint_id]
+            self.data.qpos[adr] = np.clip(np.random.normal(0, randomness), range_min, range_max)
+
+    def reset(self, seed=None, **kwargs):
+        mujoco.mj_resetData(self.model, self.data)
+        self._randomize_joint_positions(randomness=self.initial_randomness)
+        self.done = False
+        return self._get_obs(), {}
+
+    def _get_gyro_data(self):
+        return self.data.sensordata[self.gyro_sensor_id:self.gyro_sensor_id+3]
+
+    def _get_accel_data(self):
+        return self.data.sensordata[self.accel_sensor_id:self.accel_sensor_id+3]
+
+    def _get_motor_positions(self):
+        return self.data.sensordata[self.motor_positions_sensor_ids]
+
+    def _get_motor_velocities(self):
+        return self.data.sensordata[self.motor_velocities_sensor_ids]
+
+
+    def _get_obs(self):
+        raw_imu_data = [
+            *self._get_accel_data(),
+            *self._get_gyro_data()
+        ]
+
+        obs = np.array([
+            *self._get_motor_positions(),
+            *self._get_motor_velocities(),
+            *raw_imu_data,
+            self._get_root_height(),
+        ])
+
+        return obs.astype(np.float32)
+
+    def _get_info(self):
+        return {}
+
+    def overturned(self):
+        return self._get_root_upright() < 0
+
+    def _get_root_upright(self):
+        xmat = self.data.xmat[self.body_id]
+        z_axis = np.array([xmat[6], xmat[7], xmat[8]])
+        dot = np.dot(z_axis, [0, 0, 1])
+        return dot
+
+    def _get_root_height(self):
+        _, _, height = self.data.xpos[self.body_id]
+        return height
+
+    def _get_reward(self):
+        upright, height = self._get_root_upright(), self._get_root_height()
+        standing = tolerance(
+            height,
+            bounds=(_STANDING_HEIGHT, float('inf')),
+            margin=_STANDING_HEIGHT/2
+        )
+        upright = (1 + upright) / 2
+        stand_reward = (3*standing + upright) / 4
+        return stand_reward
+
+    def step(self, action):
+        action = action.clip(-1, 1)
+
+        for i, servo_id in enumerate(self.servos):
+            self.data.ctrl[servo_id] = action[i]
+
+        mujoco.mj_step(self.model, self.data)
+
+        state = self._get_obs()
+        reward = self._get_reward()
+        if self.overturned():
+            self.done = True
+        return (state, reward, self.done, self.done, {})
+    
+    def render(self, mode='rgb_array'):
+        if mode == 'rgb_array':
+            with mujoco.Renderer(self.model) as renderer:
+                renderer.update_scene(self.data, camera=self.camera)
+                pixels = renderer.render()
+                return pixels
+        else:
+            raise ValueError(f"Invalid render mode: {mode}")
