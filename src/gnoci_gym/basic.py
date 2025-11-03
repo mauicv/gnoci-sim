@@ -3,7 +3,7 @@ import gymnasium as gym
 import numpy as np
 import os
 from .utils import tolerance
-from .load_xml import _load_and_perturb_xml, basic_attributes
+from .load_xml import _load_and_perturb_basic_xml
 
 _STANDING_HEIGHT = 145
 
@@ -26,14 +26,23 @@ class BasicGnociGymEnv(gym.Env):
             render_mode='rgb_array',
             env_rate=0.005,
             initial_randomness=0.6,
-            attributes=basic_attributes,
+            motor_gear_range=(500000, 700000),
+            motor_gear_noise=10000,
+            inertial_mass_range=(0.04, 0.06),
+            inertial_mass_noise=0.01,
         ):
         self.camera = camera
         self.render_mode = render_mode
         self.done = False
         self.env_rate = env_rate
         self.initial_randomness = initial_randomness
-        xml_content = _load_and_perturb_xml('gnoci_basic', attributes)
+        xml_content = _load_and_perturb_basic_xml(
+            'gnoci_basic',
+            motor_gear_range=motor_gear_range,
+            motor_gear_noise=motor_gear_noise,
+            inertial_mass_range=inertial_mass_range,
+            inertial_mass_noise=inertial_mass_noise,
+        )
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = self.env_rate
