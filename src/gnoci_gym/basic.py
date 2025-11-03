@@ -3,6 +3,7 @@ import gymnasium as gym
 import numpy as np
 import os
 from .utils import tolerance
+from .load_xml import _load_and_perturb_xml, basic_attributes
 
 _STANDING_HEIGHT = 145
 
@@ -25,17 +26,15 @@ class BasicGnociGymEnv(gym.Env):
             render_mode='rgb_array',
             env_rate=0.005,
             initial_randomness=0.6,
+            attributes=basic_attributes,
         ):
         self.camera = camera
         self.render_mode = render_mode
         self.done = False
         self.env_rate = env_rate
         self.initial_randomness = initial_randomness
-        
-        package_dir = os.path.dirname(os.path.abspath(__file__))
-        xml_path = os.path.join(package_dir, 'desc', 'gnoci_basic.xml')
-        
-        self.model = mujoco.MjModel.from_xml_path(xml_path)
+        xml_content = _load_and_perturb_xml('gnoci_basic', attributes)
+        self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = self.env_rate
         self.observation_space = gym.spaces.Box(
