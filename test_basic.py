@@ -6,10 +6,23 @@ import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import mujoco
 
+basic_attributes = {
+    'actuator/motor': {
+        'gear': {
+            'value': 600000,
+            'perturbation': 1,
+        }
+    }
+}
 
 gym.register(
     id="gnoci_gym/Gnoci-v0",
     entry_point=BasicGnociGymEnv,
+    kwargs={
+        'env_rate': 0.005,
+        'initial_randomness': 0.6,
+        'attributes': basic_attributes,
+    }
 )
 
 env = gym.make(

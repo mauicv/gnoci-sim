@@ -12,6 +12,7 @@ basic_attributes = {
     }
 }
 
+
 complex_attributes = {
     'actuator/position': {
         'kp': {
@@ -20,6 +21,7 @@ complex_attributes = {
         }
     },
 }
+
 
 def _load_and_perturb_xml(env_name, attributes):
     package_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,5 +39,4 @@ def _load_and_perturb_xml(env_name, attributes):
                 if attribute_value['perturbation'] > 0:
                     new_val = np.random.normal(attribute_value['value'], attribute_value['perturbation'])
                     child.attrib[attribute] = str(new_val)
-                    print(value, attribute, new_val)
     return ET.tostring(xml_root, encoding='utf8')
