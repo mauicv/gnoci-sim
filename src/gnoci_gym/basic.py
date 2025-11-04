@@ -36,16 +36,10 @@ class BasicGnociGymEnv(gym.Env):
         self.done = False
         self.env_rate = env_rate
         self.initial_randomness = initial_randomness
-        xml_content = _load_and_perturb_basic_xml(
-            'gnoci_basic',
-            motor_gear_range=motor_gear_range,
-            motor_gear_noise=motor_gear_noise,
-            inertial_mass_range=inertial_mass_range,
-            inertial_mass_noise=inertial_mass_noise,
-        )
-        self.model = mujoco.MjModel.from_xml_string(xml_content)
-        self.data = mujoco.MjData(self.model)
-        self.model.opt.timestep = self.env_rate
+        self.motor_gear_range = motor_gear_range
+        self.motor_gear_noise = motor_gear_noise
+        self.inertial_mass_range = inertial_mass_range
+        self.inertial_mass_noise = inertial_mass_noise
         self.observation_space = gym.spaces.Box(
             -np.inf,
             np.inf,
@@ -56,7 +50,19 @@ class BasicGnociGymEnv(gym.Env):
         self.action_space = gym.spaces.Box(
             -1, 1, shape=(6,), dtype=np.float32
         )
+        self.initialize_model()
 
+    def initialize_model(self):
+        xml_content = _load_and_perturb_basic_xml(
+            'gnoci_basic',
+            motor_gear_range=self.motor_gear_range,
+            motor_gear_noise=self.motor_gear_noise,
+            inertial_mass_range=self.inertial_mass_range,
+            inertial_mass_noise=self.inertial_mass_noise,
+        )
+        self.model = mujoco.MjModel.from_xml_string(xml_content)
+        self.model.opt.timestep = self.env_rate
+        self.data = mujoco.MjData(self.model)
         self.gyro_sensor_id = self.model.sensor('gyro').id
         self.accel_sensor_id = self.model.sensor('accel').id
 
@@ -90,6 +96,7 @@ class BasicGnociGymEnv(gym.Env):
             "root"
         )
 
+
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
             joint_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
@@ -100,6 +107,7 @@ class BasicGnociGymEnv(gym.Env):
             self.data.qpos[adr] = np.clip(np.random.normal(0, randomness), range_min, range_max)
 
     def reset(self, seed=None, **kwargs):
+        self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self.done = False
