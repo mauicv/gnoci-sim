@@ -80,7 +80,7 @@
             pos="-250. -250. 375."
             xyaxes="0.7071 -0.7071 0 0.4082 0.4082 0.8165"
         />
-        <body name="root" pos="0 0 153" quat="1 0 0 0">
+        <body name="root" pos="0 0 157" quat="1 0 0 0">
             <freejoint name="root" />
             <site name="imu" size="0.01" pos="0 0 0" />
             <geom name="root" class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
@@ -104,6 +104,7 @@
                         <geom class="body" type="capsule" size="10" fromto="0 0 0 5 -5 -85" pos="0 0 0" quat="1 0 0 0"/>
                         <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
                         <joint name="lower-leg-left-joint" pos="0 0 0" axis="0 -1 0" range="-1.15 0.3"/>
+                        <site name="foot-left" size="10.2" pos="5 -5 -85" />
                     </body>
                 </body>
             </body>
@@ -124,6 +125,7 @@
                         <geom class="body" type="capsule" size="10" fromto="0 0 0 5 5 -85" pos="0 0 0" quat="1 0 0 0"/>
                         <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
                         <joint name="lower-leg-right-joint" pos="0 0 0" axis="0 1 0" range="-0.3 1.15"/>
+                        <site name="foot-right" size="10.2" pos="5 5 -85" />
                     </body>
                 </body>
             </body>
@@ -160,6 +162,9 @@
 
         <gyro name="gyro" site="imu" noise="0.005" cutoff="34.9" />
         <accelerometer name="accel" site="imu" noise="0.01" cutoff="40"/>
+
+        <touch name="left-foot-contact" site="foot-left"/>
+        <touch name="right-foot-contact" site="foot-right"/>
 
     </sensor>
 </mujoco>

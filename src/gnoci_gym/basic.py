@@ -43,7 +43,7 @@ class BasicGnociGymEnv(gym.Env):
         self.observation_space = gym.spaces.Box(
             -np.inf,
             np.inf,
-            shape=(18 + 1,),
+            shape=(18 + 1 + 2,),
             dtype=np.float32
         )
 
@@ -82,6 +82,11 @@ class BasicGnociGymEnv(gym.Env):
             self.model.sensor('hip-right-servo-vel').id,
             self.model.sensor('thigh-right-servo-vel').id,
             self.model.sensor('lower-leg-right-servo-vel').id,
+        ]
+
+        self.contact_forces_sensor_ids = [
+            self.model.sensor('left-foot-contact').id,
+            self.model.sensor('right-foot-contact').id,
         ]
 
         self.servos = []
@@ -125,6 +130,8 @@ class BasicGnociGymEnv(gym.Env):
     def _get_motor_velocities(self):
         return self.data.sensordata[self.motor_velocities_sensor_ids]
 
+    def _get_contact_forces(self):
+        return self.data.sensordata[self.contact_forces_sensor_ids]
 
     def _get_obs(self):
         raw_imu_data = [
@@ -135,6 +142,7 @@ class BasicGnociGymEnv(gym.Env):
         obs = np.array([
             *self._get_motor_positions(),
             *self._get_motor_velocities(),
+            *self._get_contact_forces(),
             *raw_imu_data,
             self._get_root_height(),
         ])

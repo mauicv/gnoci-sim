@@ -23,7 +23,7 @@ gym.register(
 env = gym.make(
     "gnoci_gym/Gnoci-v0",
     env_rate=0.005,
-    initial_randomness=0.6,
+    initial_randomness=0.2,
 )
 
 state, *_ = env.reset(seed=0)

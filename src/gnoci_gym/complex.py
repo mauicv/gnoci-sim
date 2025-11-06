@@ -79,6 +79,11 @@ class ComplexGnociGymEnv(gym.Env):
             self.model.sensor('lower-leg-right-servo-vel').id,
         ]
 
+        self.contact_forces_sensor_ids = [
+            self.model.sensor('left-foot-contact').id,
+            self.model.sensor('right-foot-contact').id,
+        ]
+
         self.servos = []
         for i in range(self.model.nu):
             if mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) == 'root':
@@ -132,6 +137,8 @@ class ComplexGnociGymEnv(gym.Env):
     def _get_motor_velocities(self):
         return self.data.sensordata[self.motor_velocities_sensor_ids]
 
+    def _get_contact_forces(self):
+        return self.data.sensordata[self.contact_forces_sensor_ids]
 
     def _get_obs(self):
         raw_imu_data = [
