@@ -60,7 +60,7 @@
         />
         <material
             name="body"
-            rgba="0.5 0.9 0.2 0"
+            rgba="0.5 0.9 0.2 0."
         />
     </asset>
 
@@ -104,7 +104,14 @@
                         <geom class="body" type="capsule" size="10" fromto="0 0 0 5 -5 -85" pos="0 0 0" quat="1 0 0 0"/>
                         <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
                         <joint name="lower-leg-left-joint" pos="0 0 0" axis="0 -1 0" range="-1.15 0.3"/>
-                        <site name="foot-left" size="10.2" pos="5 -5 -85" />
+
+                        <body name="foot-left" pos="5 -5 -85" quat="1 0 0 0">
+                            <geom class="body" type="capsule" size="10" fromto="0 0 0 -12 0 -9" pos="0 0 0" quat="1 0 0 0"/>
+                            <geom class="visualgeom" type="capsule" size="10" fromto="0 0 0 -12 0 -9" pos="0 0 0" quat="1 0 0 0"/>
+                            <joint name="foot-left-joint" pos="0 0 0" axis="0 -1 0" range="-1 1"/>
+                            <inertial mass='0.001' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                            <site name="foot-left" size="10.2" pos="0 0 0" />
+                        </body>
                     </body>
                 </body>
             </body>
@@ -125,7 +132,14 @@
                         <geom class="body" type="capsule" size="10" fromto="0 0 0 5 5 -85" pos="0 0 0" quat="1 0 0 0"/>
                         <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
                         <joint name="lower-leg-right-joint" pos="0 0 0" axis="0 1 0" range="-0.3 1.15"/>
-                        <site name="foot-right" size="10.2" pos="5 5 -85" />
+
+                        <body name="foot-right" pos="5 5 -85" quat="1 0 0 0">
+                            <geom class="body" type="capsule" size="10" fromto="0 0 0 -12 0 -9" pos="0 0 0" quat="1 0 0 0"/>
+                            <geom class="visualgeom" type="capsule" size="10" fromto="0 0 0 -12 0 -9" pos="0 0 0" quat="1 0 0 0"/>
+                            <joint name="foot-right-joint" pos="0 0 0" axis="0 1 0" range="-1 1"/>
+                            <inertial mass='0.001' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                            <site name="foot-right" size="10.2" pos="0 0 0" />
+                        </body>
                     </body>
                 </body>
             </body>
@@ -139,6 +153,8 @@
         <motor name="servo-thigh-right" joint="thigh-right-joint"/>
         <motor name="servo-lower-leg-left" joint="lower-leg-left-joint"/>
         <motor name="servo-lower-leg-right" joint="lower-leg-right-joint"/>
+        <motor name="servo-foot-left" joint="foot-left-joint"/>
+        <motor name="servo-foot-right" joint="foot-right-joint"/>
     </actuator>
 
     <sensor>
@@ -159,6 +175,12 @@
 
         <actuatorpos name="lower-leg-right-servo-pos" actuator="servo-lower-leg-right" />
         <actuatorvel name="lower-leg-right-servo-vel" actuator="servo-lower-leg-right" />
+
+        <actuatorpos name="foot-left-servo-pos" actuator="servo-foot-left" />
+        <actuatorvel name="foot-left-servo-vel" actuator="servo-foot-left" />
+
+        <actuatorpos name="foot-right-servo-pos" actuator="servo-foot-right" />
+        <actuatorvel name="foot-right-servo-vel" actuator="servo-foot-right" />
 
         <gyro name="gyro" site="imu" noise="0.005" cutoff="34.9" />
         <accelerometer name="accel" site="imu" noise="0.01" cutoff="40"/>

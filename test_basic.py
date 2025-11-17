@@ -40,7 +40,7 @@ horizontal_state = []
 standing_height = []
 
 for i in tqdm(range(100)):
-    action = np.random.uniform(-1, 1, 6)
+    action = np.random.uniform(-1, 1, 8)
     # action = np.array([1,1,1,1,1,1])
     state, reward, done, truncated, _ = env.step(action)
     body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")

@@ -43,12 +43,12 @@ class BasicGnociGymEnv(gym.Env):
         self.observation_space = gym.spaces.Box(
             -np.inf,
             np.inf,
-            shape=(18 + 1 + 2,),
+            shape=(8 + 8 + 2 + 6 + 1,), # motor positions, motor velocities, contact forces, imu data, root height
             dtype=np.float32
         )
 
         self.action_space = gym.spaces.Box(
-            -1, 1, shape=(6,), dtype=np.float32
+            -1, 1, shape=(8,), dtype=np.float32
         )
         self.initialize_model()
 
@@ -73,6 +73,8 @@ class BasicGnociGymEnv(gym.Env):
             self.model.sensor('hip-right-servo-pos').id,
             self.model.sensor('thigh-right-servo-pos').id,
             self.model.sensor('lower-leg-right-servo-pos').id,
+            self.model.sensor('foot-left-servo-pos').id,
+            self.model.sensor('foot-right-servo-pos').id,
         ]
 
         self.motor_velocities_sensor_ids = [
@@ -82,6 +84,8 @@ class BasicGnociGymEnv(gym.Env):
             self.model.sensor('hip-right-servo-vel').id,
             self.model.sensor('thigh-right-servo-vel').id,
             self.model.sensor('lower-leg-right-servo-vel').id,
+            self.model.sensor('foot-left-servo-vel').id,
+            self.model.sensor('foot-right-servo-vel').id,
         ]
 
         self.contact_forces_sensor_ids = [
@@ -100,7 +104,6 @@ class BasicGnociGymEnv(gym.Env):
             mujoco.mjtObj.mjOBJ_BODY,
             "root"
         )
-
 
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
