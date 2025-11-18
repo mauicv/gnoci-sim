@@ -26,6 +26,12 @@ env.reset()
 
 ```
 
-![](assets/animation-complex.gif)
+![](assets/animation.gif)
 
-See also [this](https://colab.research.google.com/drive/13MDYzpxYmWT-9RKIIiF1CMuo6QNOUCGv?authuser=1) notebook
+
+## Environments:
+
+Currently 3 environments are available: `BasicGnociGymEnv`, `ComplexGnociGymEnv` and `BasicGnociQuadGymEnv`. 
+
+
+For colab notebook example see [this](https://colab.research.google.com/drive/13MDYzpxYmWT-9RKIIiF1CMuo6QNOUCGv?authuser=1).
