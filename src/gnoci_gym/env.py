@@ -96,6 +96,8 @@ class GnociGymEnv(gym.Env):
             self.model.sensor('back-right-foot-contact').id,
         ]
 
+        self.velocity_sensor_id = self.model.sensor('velocity').id
+
         self.servos = []
         for servo_id in range(self.model.nu):
             if mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, servo_id) == 'root':
@@ -171,6 +173,9 @@ class GnociGymEnv(gym.Env):
         _, _, height = self.data.xpos[self.body_id]
         return height
 
+    def _get_velocity(self):
+        return self.data.sensordata[self.velocity_sensor_id:self.velocity_sensor_id+3]
+
     def _get_reward(self):
         upright, height = self._get_root_upright(), self._get_root_height()
         standing = tolerance(
@@ -180,7 +185,13 @@ class GnociGymEnv(gym.Env):
         )
         upright = (1 + upright) / 2
         stand_reward = (3*standing + upright) / 4
-        return stand_reward
+        forward_velocity = self._get_velocity()[0]
+        velocity_reward = tolerance(
+            forward_velocity,
+            bounds=(1, float('inf')),
+            margin=0.5
+        )
+        return stand_reward * (5*velocity_reward + 1) / 6
 
     def step(self, action):
         action = action.clip(-1, 1)

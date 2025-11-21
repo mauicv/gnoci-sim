@@ -205,6 +205,7 @@
 
         <gyro name="gyro" site="imu" noise="0.005" cutoff="34.9" />
         <accelerometer name="accel" site="imu" noise="0.01" cutoff="40"/>
+        <velocimeter name="velocity" site="imu"/>
 
         <touch name="front-left-foot-contact" site="foot-front-left"/>
         <touch name="front-right-foot-contact" site="foot-front-right"/>
