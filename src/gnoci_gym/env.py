@@ -2,20 +2,12 @@ import mujoco
 import gymnasium as gym
 import numpy as np
 import os
-from .filters import ComplementaryFilter, KalmanMPU6050Filter
-from .servo import Servo
 from .utils import tolerance
+from .load_xml import _load_and_perturb_basic_xml
 
-_STANDING_HEIGHT = 145
+_STANDING_HEIGHT = 0.157
 
-generic_values = {
-    "kp": 0.35,
-    "ki": 0.0,
-    "kd": 0.05,
-}
-
-
-class ComplexGnociGymEnv(gym.Env):
+class GnociGymEnv(gym.Env):
     metadata = {
         'render_modes': ['rgb_array'],
         'render_fps': 30,
@@ -23,84 +15,92 @@ class ComplexGnociGymEnv(gym.Env):
     
     def __init__(
             self,
-            env_rate=0.005,
-            system_rate=0.01,
-            control_rate=0.05,
-            initial_randomness=0.6,
             camera='track',
-            render_mode='rgb_array'
+            render_mode='rgb_array',
+            env_rate=0.005,
+            initial_randomness=0.6,
+            motor_gear_range=(-0.5, 1.5),
+            motor_gear_noise=0.01,
+            inertial_mass_range=(0.04, 0.06),
+            inertial_mass_noise=0.01,
         ):
         self.camera = camera
         self.render_mode = render_mode
-        self.env_rate = env_rate
-        self.system_rate = system_rate
-        self.control_rate = control_rate
         self.done = False
+        self.env_rate = env_rate
         self.initial_randomness = initial_randomness
-        
-        package_dir = os.path.dirname(os.path.abspath(__file__))
-        xml_path = os.path.join(package_dir, 'desc', 'gnoci_complex.xml')
-        
-        self.model = mujoco.MjModel.from_xml_path(xml_path)
-        self.data = mujoco.MjData(self.model)
-        self.model.opt.timestep = self.env_rate
-        self.cf = ComplementaryFilter()
-        self.kalman_filter = KalmanMPU6050Filter()
-
+        self.motor_gear_range = motor_gear_range
+        self.motor_gear_noise = motor_gear_noise
+        self.inertial_mass_range = inertial_mass_range
+        self.inertial_mass_noise = inertial_mass_noise
         self.observation_space = gym.spaces.Box(
             -np.inf,
             np.inf,
-            shape=(20,),
+            shape=(4*3 + 4*3 + 4 + 6 + 1,), # motor positions, motor velocities, contact forces, imu data, root height
             dtype=np.float32
         )
 
         self.action_space = gym.spaces.Box(
-            -1, 1, shape=(6,), dtype=np.float32
+            -1, 1, shape=(16,), dtype=np.float32
         )
+        self.initialize_model()
 
+    def initialize_model(self):
+        xml_content = _load_and_perturb_basic_xml(
+            'gnoci',
+            motor_gear_range=self.motor_gear_range,
+            motor_gear_noise=self.motor_gear_noise,
+            inertial_mass_range=self.inertial_mass_range,
+            inertial_mass_noise=self.inertial_mass_noise,
+        )
+        self.model = mujoco.MjModel.from_xml_string(xml_content)
+        self.model.opt.timestep = self.env_rate
+        self.data = mujoco.MjData(self.model)
         self.gyro_sensor_id = self.model.sensor('gyro').id
         self.accel_sensor_id = self.model.sensor('accel').id
 
         self.motor_positions_sensor_ids = [
-            self.model.sensor('hip-left-servo-pos').id,
-            self.model.sensor('thigh-left-servo-pos').id,
-            self.model.sensor('lower-leg-left-servo-pos').id,
-            self.model.sensor('hip-right-servo-pos').id,
-            self.model.sensor('thigh-right-servo-pos').id,
-            self.model.sensor('lower-leg-right-servo-pos').id,
+            self.model.sensor('hip-front-left-servo-pos').id,
+            self.model.sensor('hip-front-right-servo-pos').id,
+            self.model.sensor('hip-back-left-servo-pos').id,
+            self.model.sensor('hip-back-right-servo-pos').id,
+            self.model.sensor('thigh-front-left-servo-pos').id,
+            self.model.sensor('thigh-front-right-servo-pos').id,
+            self.model.sensor('thigh-back-left-servo-pos').id,
+            self.model.sensor('thigh-back-right-servo-pos').id,
+            self.model.sensor('lower-leg-front-left-servo-pos').id,
+            self.model.sensor('lower-leg-front-right-servo-pos').id,
+            self.model.sensor('lower-leg-back-left-servo-pos').id,
+            self.model.sensor('lower-leg-back-right-servo-pos').id,
         ]
 
         self.motor_velocities_sensor_ids = [
-            self.model.sensor('hip-left-servo-vel').id,
-            self.model.sensor('thigh-left-servo-vel').id,
-            self.model.sensor('lower-leg-left-servo-vel').id,
-            self.model.sensor('hip-right-servo-vel').id,
-            self.model.sensor('thigh-right-servo-vel').id,
-            self.model.sensor('lower-leg-right-servo-vel').id,
+            self.model.sensor('hip-front-left-servo-vel').id,
+            self.model.sensor('hip-front-right-servo-vel').id,
+            self.model.sensor('hip-back-left-servo-vel').id,
+            self.model.sensor('hip-back-right-servo-vel').id,
+            self.model.sensor('thigh-front-left-servo-vel').id,
+            self.model.sensor('thigh-front-right-servo-vel').id,
+            self.model.sensor('thigh-back-left-servo-vel').id,
+            self.model.sensor('thigh-back-right-servo-vel').id,
+            self.model.sensor('lower-leg-front-left-servo-vel').id,
+            self.model.sensor('lower-leg-front-right-servo-vel').id,
+            self.model.sensor('lower-leg-back-left-servo-vel').id,
+            self.model.sensor('lower-leg-back-right-servo-vel').id,
         ]
 
         self.contact_forces_sensor_ids = [
-            self.model.sensor('left-foot-contact').id,
-            self.model.sensor('right-foot-contact').id,
+            self.model.sensor('front-left-foot-contact').id,
+            self.model.sensor('front-right-foot-contact').id,
+            self.model.sensor('back-left-foot-contact').id,
+            self.model.sensor('back-right-foot-contact').id,
         ]
 
         self.servos = []
-        for i in range(self.model.nu):
-            if mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) == 'root':
+        for servo_id in range(self.model.nu):
+            if mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, servo_id) == 'root':
                 continue
-            actuator_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-            servo_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name)
-            pin_limits=(self.model.actuator_ctrlrange[servo_id][0], self.model.actuator_ctrlrange[servo_id][1])
-            servo = Servo(
-                name=actuator_name,
-                pin_id=0,
-                pin=servo_id,
-                pin_limits=pin_limits,
-                init_value=0.0,
-                offset=0.0,
-                **generic_values
-            )
-            self.servos.append(servo)
+            self.servos.append(servo_id)
 
         self.body_id = mujoco.mj_name2id(
             self.model,
@@ -118,10 +118,9 @@ class ComplexGnociGymEnv(gym.Env):
             self.data.qpos[adr] = np.clip(np.random.normal(0, randomness), range_min, range_max)
 
     def reset(self, seed=None, **kwargs):
+        self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
         self._randomize_joint_positions(randomness=self.initial_randomness)
-        self.cf.reset()
-        self.kalman_filter.reset()
         self.done = False
         return self._get_obs(), {}
 
@@ -146,15 +145,12 @@ class ComplexGnociGymEnv(gym.Env):
             *self._get_gyro_data()
         ]
 
-        self.cf.update(raw_imu_data[0:3], raw_imu_data[3:6])
-        filtered_imu_data = self.kalman_filter(raw_imu_data)
-
         obs = np.array([
             *self._get_motor_positions(),
             *self._get_motor_velocities(),
-            np.float32(self.cf.roll),
-            np.float32(self.cf.pitch),
-            *filtered_imu_data
+            *self._get_contact_forces(),
+            *raw_imu_data,
+            self._get_root_height(),
         ])
 
         return obs.astype(np.float32)
@@ -189,16 +185,10 @@ class ComplexGnociGymEnv(gym.Env):
     def step(self, action):
         action = action.clip(-1, 1)
 
-        for i, servo in enumerate(self.servos):
-            servo.update_setpoint_delta(action[i])
+        for i, servo_id in enumerate(self.servos):
+            self.data.ctrl[servo_id] = action[i]
 
-        for step in range(int(self.control_rate/self.env_rate)):
-            mujoco.mj_step(self.model, self.data)
-
-            if step % int(self.control_rate/self.system_rate) == 0:
-                for servo in self.servos:
-                    servo_pos = servo.update()
-                    self.data.ctrl[servo.pin] = servo_pos
+        mujoco.mj_step(self.model, self.data)
 
         state = self._get_obs()
         reward = self._get_reward()

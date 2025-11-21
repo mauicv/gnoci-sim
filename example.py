@@ -1,4 +1,4 @@
-from gnoci_gym import BasicGnociQuadGymEnv, ComplexGnociGymEnv, BasicGnociGymEnv
+from gnoci_gym import GnociGymEnv
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
@@ -7,25 +7,14 @@ import matplotlib.pyplot as plt
 import mujoco
 import sys
 
-if len(sys.argv) > 1:
-    ENV = sys.argv[1]
-else:
-    ENV = "basic-quad"
-
-envs = {
-    "basic": BasicGnociGymEnv,
-    "complex": ComplexGnociGymEnv,
-    "basic-quad": BasicGnociQuadGymEnv,
-}
-
 gym.register(
     id="gnoci_gym/Gnoci-v0",
-    entry_point=envs[ENV],
+    entry_point=GnociGymEnv,
     kwargs={
         'env_rate': 0.005,
         'initial_randomness': 0.6,
-        'motor_gear_range': (500000, 700000),
-        'motor_gear_noise': 10000,
+        'motor_gear_range': (0.5, 1.5),
+        'motor_gear_noise': 0.01,
         'inertial_mass_range': (0.04, 0.06),
         'inertial_mass_noise': 0.01,
     }

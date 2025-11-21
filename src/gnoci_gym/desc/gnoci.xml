@@ -1,7 +1,6 @@
 <mujoco model="gnoci">
-    <option timestep="0.005" gravity="0 0 -9810"/>
-    <compiler angle="radian" meshdir="meshes" eulerseq="zyx" autolimits="true"/>
-
+    <option timestep="0.005" gravity="0 0 -9.8"/>
+    <compiler angle="radian" meshdir="meshes" eulerseq="zyx" autolimits="true" inertiafromgeom="true"/>
 
     <default>
         <joint
@@ -11,14 +10,14 @@
             frictionloss="0.01"
         />
         <position 
-            kp="250000"
+            kp="2.5"
             dampratio="0.5"
             forcelimited="true"
-            forcerange="-5000000 5000000"
+            forcerange="-1 1"
         />
         <motor 
             ctrlrange="-1 1"
-            gear="1000000"
+            gear="1"
         />
         <default class="visualgeom">
             <geom 
@@ -41,13 +40,13 @@
     </default>
 
     <asset>
-        <mesh name="body-main" content_type="model/stl" file="body-main-quad.stl" />
-        <mesh name="hip-left" content_type="model/stl" file="hip-left.stl" />
-        <mesh name="hip-right" content_type="model/stl" file="hip-right.stl" />
-        <mesh name="thigh-left" content_type="model/stl" file="thigh-left.stl" />
-        <mesh name="thigh-right" content_type="model/stl" file="thigh-right.stl" />
-        <mesh name="lower-leg-left" content_type="model/stl" file="lower-leg-left.stl" />
-        <mesh name="lower-leg-right" content_type="model/stl" file="lower-leg-right.stl"/>
+        <mesh name="body-main" content_type="model/stl" file="body-main-quad.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="hip-left" content_type="model/stl" file="hip-left.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="hip-right" content_type="model/stl" file="hip-right.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="thigh-left" content_type="model/stl" file="thigh-left.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="thigh-right" content_type="model/stl" file="thigh-right.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="lower-leg-left" content_type="model/stl" file="lower-leg-left.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="lower-leg-right" content_type="model/stl" file="lower-leg-right.stl" scale="0.001 0.001 0.001"/>
         <texture builtin="checker" height="100" name="texplane" rgb1="0 0 0" rgb2="0.8 0.8 0.8" type="2d" width="100"/>
         <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texplane"/>
         <material
@@ -56,7 +55,7 @@
         />
         <material
             name="body"
-            rgba="0.5 0.9 0.2 0"
+            rgba="0.5 0.9 0.2 0.0"
         />
     </asset>
 
@@ -69,101 +68,92 @@
             dir="0 0 -1"
             castshadow="false"
         />
-        <geom condim="3" friction="1 .1 .1" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="1000 1000 0.125" type="plane"/>
+        <geom condim="3" friction="1 .1 .1" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="10 10 0.0125" type="plane"/>
         <camera
             name="track"
             mode="trackcom"
-            pos="-250. -250. 375."
+            pos="-0.25 -0.25 0.375"
             xyaxes="0.7071 -0.7071 0 0.4082 0.4082 0.8165"
         />
-        <body name="root" pos="0 0 157" quat="1 0 0 0">
+        <body name="root" pos="0 0 0.157" quat="1 0 0 0">
             <freejoint name="root" />
             <site name="imu" size="0.01" pos="0 0 0" />
             <geom name="root" class="visualgeom" type="mesh" mesh="body-main" pos="0 0 0" quat="1 0 0 0"/>
-            <geom class="body" type="box" size="115 50 15" pos="0 0 10"/>
-            <geom class="body" type="box" size="50 50 17" pos="0 0 -23"/>
-            <inertial mass="0.195" diaginertia="1000 1000 1000" pos="0 0 0"/>
+            <geom class="body" type="box" size="0.115 0.05 0.015" pos="0 0 0.015" density="400"/>
+            <geom class="body" type="box" size="0.05 0.05 0.017" pos="0 0 -0.023" density="400"/>
 
-            <body name="hip-front-left" pos="-89.5 -25 -30" quat="1 0 0 0">
+            <body name="hip-front-left" pos="-0.0895 -0.025 -0.03" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-left" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="cylinder" size="22 32" pos="0 -26 0" quat="1 1 0 0"/>
-                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
-                <joint name="hip-front-left-joint" pos="0 -10 0" axis="1 0 0" range="-0.38 0.42"/>
+                <geom class="body" type="cylinder" size="0.022 0.032" pos="0 -0.026 0" quat="1 1 0 0" density="400"/>
+                <joint name="hip-front-left-joint" pos="0 -0.01 0" axis="1 0 0" range="-0.38 0.42"/>
 
-                <body name="thigh-front-left" pos="7 -30 5" quat="1 0 -0.38 0">
+                <body name="thigh-front-left" pos="0.007 -0.03 0.005" quat="1 0 -0.38 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-left" pos="0 0 0" quat="1 0 0 0"/>
-                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <geom class="body" type="cylinder" size="0.007 0.003" pos="0 0 0.005" density="400"/>
                     <joint name="thigh-front-left-joint" pos="0 0 0" axis="0 -1 0" range="-0.65 1"/>
 
-                    <body name="lower-leg-front-left" pos="0 -12 -62" quat="1 0 0.75 0">
+                    <body name="lower-leg-front-left" pos="0 -0.012 -0.062" quat="1 0 0.75 0">
                         <geom class="visualgeom" type="mesh" mesh="lower-leg-left" pos="0 0 0" quat="1 0 0 0"/>
-                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 -5 -85" pos="0 0 0" quat="1 0 0 0"/>
-                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <geom class="body" type="capsule" size="0.01" fromto="0 0 0 0.005 -0.005 -0.085" pos="0 0 0" quat="1 0 0 0" density="400"/>
                         <joint name="lower-leg-front-left-joint" pos="0 0 0" axis="0 -1 0" range="-1.15 0.3"/>
-                        <site name="foot-front-left" size="10.2" pos="5 -5 -85" />
+                        <site name="foot-front-left" size="0.0102" pos="0.005 -0.005 -0.085" />
                     </body>
                 </body>
             </body>
 
-            <body name="hip-front-right" pos="-89.5 25 -30" quat="1 0 0 0">
+            <body name="hip-front-right" pos="-0.0895 0.025 -0.03" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-right" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="cylinder" size="22 32" pos="0 26 0" quat="1 1 0 0"/>
-                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
-                <joint name="hip-front-right-joint" pos="0 10 0" axis="1 0 0" range="-0.42 0.38"/>
+                <geom class="body" type="cylinder" size="0.022 0.032" pos="0 0.026 0" quat="1 1 0 0" density="400"/>
+                <joint name="hip-front-right-joint" pos="0 0.01 0" axis="1 0 0" range="-0.42 0.38"/>
 
-                <body name="thigh-front-right" pos="7 30 5" quat="1 0 -0.38 0">
+                <body name="thigh-front-right" pos="0.007 0.03 0.005" quat="1 0 -0.38 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-right" pos="0 0 0" quat="1 0 0 0"/>
-                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <geom class="body" type="cylinder" size="0.007 0.003" pos="0 0 0.005" density="400"/>
                     <joint name="thigh-front-right-joint" pos="0 0 0" axis="0 1 0" range="-1 0.65"/>
 
-                    <body name="lower-leg-front-right" pos="0 12 -62" quat="1 0 0.75 0">
+                    <body name="lower-leg-front-right" pos="0 0.012 -0.062" quat="1 0 0.75 0">
                         <geom class="visualgeom" type="mesh" mesh="lower-leg-right" pos="0 0 0" quat="1 0 0 0"/>
-                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 5 -85" pos="0 0 0" quat="1 0 0 0"/>
-                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <geom class="body" type="capsule" size="0.01" fromto="0 0 0 0.005 0.005 -0.085" pos="0 0 0" quat="1 0 0 0" density="400"/>
                         <joint name="lower-leg-front-right-joint" pos="0 0 0" axis="0 1 0" range="-0.3 1.15"/>
-                        <site name="foot-front-right" size="10.2" pos="5 5 -85" />
+                        <site name="foot-front-right" size="0.0102" pos="0.005 0.005 -0.085" />
                     </body>
                 </body>
             </body>
 
-            <body name="hip-back-left" pos="89.5 -25 -30" quat="1 0 0 0">
+            <body name="hip-back-left" pos="0.0895 -0.025 -0.03" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-left" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="cylinder" size="22 32" pos="0 -26 0" quat="1 1 0 0"/>
-                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
-                <joint name="hip-back-left-joint" pos="0 -10 0" axis="1 0 0" range="-0.38 0.42"/>
+                <geom class="body" type="cylinder" size="0.022 0.032" pos="0 -0.026 0" quat="1 1 0 0" density="400"/>
+                <joint name="hip-back-left-joint" pos="0 -0.01 0" axis="1 0 0" range="-0.38 0.42"/>
 
-                <body name="thigh-back-left" pos="7 -30 5" quat="1 0 -0.38 0">
+                <body name="thigh-back-left" pos="0.007 -0.03 0.005" quat="1 0 -0.38 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-left" pos="0 0 0" quat="1 0 0 0"/>
-                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <geom class="body" type="cylinder" size="0.007 0.003" pos="0 0 0.005" density="400"/>
                     <joint name="thigh-back-left-joint" pos="0 0 0" axis="0 -1 0" range="-0.65 1"/>
 
-                    <body name="lower-leg-back-left" pos="0 -12 -62" quat="1 0 0.75 0">
+                    <body name="lower-leg-back-left" pos="0 -0.012 -0.062" quat="1 0 0.75 0">
                         <geom class="visualgeom" type="mesh" mesh="lower-leg-left" pos="0 0 0" quat="1 0 0 0"/>
-                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 -5 -85" pos="0 0 0" quat="1 0 0 0"/>
-                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <geom class="body" type="capsule" size="0.01" fromto="0 0 0 0.005 -0.005 -0.085" pos="0 0 0" quat="1 0 0 0" density="400"/> 
                         <joint name="lower-leg-back-left-joint" pos="0 0 0" axis="0 -1 0" range="-1.15 0.3"/>
-                        <site name="foot-back-left" size="10.2" pos="5 -5 -85" />
+                        <site name="foot-back-left" size="0.0102" pos="0.005 -0.005 -0.085" />
                     </body>
                 </body>
             </body>
 
-            <body name="hip-back-right" pos="89.5 25 -30" quat="1 0 0 0">
+            <body name="hip-back-right" pos="0.0895 0.025 -0.03" quat="1 0 0 0">
                 <geom class="visualgeom" type="mesh" mesh="hip-right" pos="0 0 0" quat="1 0 0 0"/>
-                <geom class="body" type="cylinder" size="22 32" pos="0 26 0" quat="1 1 0 0"/>
-                <inertial mass='0.047' diaginertia="1000 1000 1000" pos="0 0 0"/>
-                <joint name="hip-back-right-joint" pos="0 10 0" axis="1 0 0" range="-0.42 0.38"/>
+                <geom class="body" type="cylinder" size="0.022 0.032" pos="0 0.026 0" quat="1 1 0 0" density="400"/>
+                <joint name="hip-back-right-joint" pos="0 0.01 0" axis="1 0 0" range="-0.42 0.38"/>
 
-                <body name="thigh-back-right" pos="7 30 5" quat="1 0 -0.38 0">
+                <body name="thigh-back-right" pos="0.007 0.03 0.005" quat="1 0 -0.38 0">
                     <geom class="visualgeom" type="mesh" mesh="thigh-right" pos="0 0 0" quat="1 0 0 0"/>
-                    <inertial mass='0.041' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                    <geom class="body" type="cylinder" size="0.007 0.003" pos="0 0 0.005" density="400"/>
                     <joint name="thigh-back-right-joint" pos="0 0 0" axis="0 1 0" range="-1 0.65"/>
 
-                    <body name="lower-leg-back-right" pos="0 12 -62" quat="1 0 0.75 0">
+                    <body name="lower-leg-back-right" pos="0 0.012 -0.062" quat="1 0 0.75 0">
                         <geom class="visualgeom" type="mesh" mesh="lower-leg-right" pos="0 0 0" quat="1 0 0 0"/>
-                        <geom class="body" type="capsule" size="10" fromto="0 0 0 5 5 -85" pos="0 0 0" quat="1 0 0 0"/>
-                        <inertial mass='0.01' diaginertia="1000 1000 1000" pos="0 0 0"/>
+                        <geom class="body" type="capsule" size="0.01" fromto="0 0 0 0.005 0.005 -0.085" pos="0 0 0" quat="1 0 0 0" density="400"/>
                         <joint name="lower-leg-back-right-joint" pos="0 0 0" axis="0 1 0" range="-0.3 1.15"/>
-                        <site name="foot-back-right" size="10.2" pos="5 5 -85" />
+                        <site name="foot-back-right" size="0.0102" pos="0.005 0.005 -0.085" />
                     </body>
                 </body>
             </body>

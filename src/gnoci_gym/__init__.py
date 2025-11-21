@@ -1,5 +1,4 @@
-from .basic import BasicGnociGymEnv
-from .complex import ComplexGnociGymEnv
-from .basic_quad import BasicGnociQuadGymEnv
+from .env import GnociGymEnv
 
-__all__ = ["BasicGnociGymEnv", "ComplexGnociGymEnv", "BasicGnociQuadGymEnv"]
+
+__all__ = ["GnociGymEnv"]
