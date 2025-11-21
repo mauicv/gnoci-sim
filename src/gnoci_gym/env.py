@@ -41,7 +41,7 @@ class GnociGymEnv(gym.Env):
         )
 
         self.action_space = gym.spaces.Box(
-            -1, 1, shape=(16,), dtype=np.float32
+            -1, 1, shape=(12,), dtype=np.float32
         )
         self.initialize_model()
 
