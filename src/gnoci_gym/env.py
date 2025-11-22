@@ -192,8 +192,8 @@ class GnociGymEnv(gym.Env):
 
         velocity_reward = tolerance(
             -velocity[0],
-            bounds=(1, float('inf')),
-            margin=0.5
+            bounds=(1, 2),
+            margin=1
         )
         total_reward = stand_reward * (5*velocity_reward + 1) / 6
         return total_reward * lateral_penalty
