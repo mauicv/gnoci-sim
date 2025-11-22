@@ -56,47 +56,47 @@ class GnociGymEnv(gym.Env):
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.model.opt.timestep = self.env_rate
         self.data = mujoco.MjData(self.model)
-        self.gyro_sensor_id = self.model.sensor('gyro').id
-        self.accel_sensor_id = self.model.sensor('accel').id
+        self.gyro_sensor_addr = self.model.sensor_adr[self.model.sensor('gyro').id]
+        self.accel_sensor_addr = self.model.sensor_adr[self.model.sensor('accel').id]
 
-        self.motor_positions_sensor_ids = [
-            self.model.sensor('hip-front-left-servo-pos').id,
-            self.model.sensor('hip-front-right-servo-pos').id,
-            self.model.sensor('hip-back-left-servo-pos').id,
-            self.model.sensor('hip-back-right-servo-pos').id,
-            self.model.sensor('thigh-front-left-servo-pos').id,
-            self.model.sensor('thigh-front-right-servo-pos').id,
-            self.model.sensor('thigh-back-left-servo-pos').id,
-            self.model.sensor('thigh-back-right-servo-pos').id,
-            self.model.sensor('lower-leg-front-left-servo-pos').id,
-            self.model.sensor('lower-leg-front-right-servo-pos').id,
-            self.model.sensor('lower-leg-back-left-servo-pos').id,
-            self.model.sensor('lower-leg-back-right-servo-pos').id,
+        self.motor_positions_sensor_addrs = [
+            self.model.sensor_adr[self.model.sensor('hip-front-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('hip-front-right-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('hip-back-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('hip-back-right-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('thigh-front-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('thigh-front-right-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('thigh-back-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('thigh-back-right-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-front-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-front-right-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-back-left-servo-pos').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-back-right-servo-pos').id],
         ]
 
-        self.motor_velocities_sensor_ids = [
-            self.model.sensor('hip-front-left-servo-vel').id,
-            self.model.sensor('hip-front-right-servo-vel').id,
-            self.model.sensor('hip-back-left-servo-vel').id,
-            self.model.sensor('hip-back-right-servo-vel').id,
-            self.model.sensor('thigh-front-left-servo-vel').id,
-            self.model.sensor('thigh-front-right-servo-vel').id,
-            self.model.sensor('thigh-back-left-servo-vel').id,
-            self.model.sensor('thigh-back-right-servo-vel').id,
-            self.model.sensor('lower-leg-front-left-servo-vel').id,
-            self.model.sensor('lower-leg-front-right-servo-vel').id,
-            self.model.sensor('lower-leg-back-left-servo-vel').id,
-            self.model.sensor('lower-leg-back-right-servo-vel').id,
+        self.motor_velocities_sensor_addrs = [
+            self.model.sensor_adr[self.model.sensor('hip-front-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('hip-front-right-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('hip-back-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('hip-back-right-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('thigh-front-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('thigh-front-right-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('thigh-back-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('thigh-back-right-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-front-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-front-right-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-back-left-servo-vel').id],
+            self.model.sensor_adr[self.model.sensor('lower-leg-back-right-servo-vel').id],
         ]
 
-        self.contact_forces_sensor_ids = [
-            self.model.sensor('front-left-foot-contact').id,
-            self.model.sensor('front-right-foot-contact').id,
-            self.model.sensor('back-left-foot-contact').id,
-            self.model.sensor('back-right-foot-contact').id,
+        self.contact_forces_sensor_addrs = [
+            self.model.sensor_adr[self.model.sensor('front-left-foot-contact').id],
+            self.model.sensor_adr[self.model.sensor('front-right-foot-contact').id],
+            self.model.sensor_adr[self.model.sensor('back-left-foot-contact').id],
+            self.model.sensor_adr[self.model.sensor('back-right-foot-contact').id],
         ]
 
-        self.velocity_sensor_id = self.model.sensor('velocity').id
+        self.velocity_sensor_addr = self.model.sensor_adr[self.model.sensor('velocity').id]
 
         self.servos = []
         for servo_id in range(self.model.nu):
@@ -127,19 +127,19 @@ class GnociGymEnv(gym.Env):
         return self._get_obs(), {}
 
     def _get_gyro_data(self):
-        return self.data.sensordata[self.gyro_sensor_id:self.gyro_sensor_id+3]
+        return self.data.sensordata[self.gyro_sensor_addr:self.gyro_sensor_addr+3]
 
     def _get_accel_data(self):
-        return self.data.sensordata[self.accel_sensor_id:self.accel_sensor_id+3]
+        return self.data.sensordata[self.accel_sensor_addr:self.accel_sensor_addr+3]
 
     def _get_motor_positions(self):
-        return self.data.sensordata[self.motor_positions_sensor_ids]
+        return self.data.sensordata[self.motor_positions_sensor_addrs]
 
     def _get_motor_velocities(self):
-        return self.data.sensordata[self.motor_velocities_sensor_ids]
+        return self.data.sensordata[self.motor_velocities_sensor_addrs]
 
     def _get_contact_forces(self):
-        return self.data.sensordata[self.contact_forces_sensor_ids]
+        return self.data.sensordata[self.contact_forces_sensor_addrs]
 
     def _get_obs(self):
         raw_imu_data = [
@@ -174,7 +174,7 @@ class GnociGymEnv(gym.Env):
         return height
 
     def _get_velocity(self):
-        return self.data.sensordata[self.velocity_sensor_id:self.velocity_sensor_id+3]
+        return self.data.sensordata[self.velocity_sensor_addr:self.velocity_sensor_addr+3].copy()
 
     def _get_reward(self):
         upright, height = self._get_root_upright(), self._get_root_height()
@@ -186,6 +186,7 @@ class GnociGymEnv(gym.Env):
         upright = (1 + upright) / 2
         stand_reward = (3*standing + upright) / 4
         forward_velocity = self._get_velocity()[0]
+        print(forward_velocity)
         velocity_reward = tolerance(
             forward_velocity,
             bounds=(1, float('inf')),
