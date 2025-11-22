@@ -174,7 +174,7 @@ class GnociGymEnv(gym.Env):
         return height
 
     def _get_velocity(self):
-        return self.data.sensordata[self.velocity_sensor_addr:self.velocity_sensor_addr+3].copy()
+        return self.data.sensordata[self.velocity_sensor_addr:self.velocity_sensor_addr+3]
 
     def _get_reward(self):
         upright, height = self._get_root_upright(), self._get_root_height()
@@ -185,14 +185,18 @@ class GnociGymEnv(gym.Env):
         )
         upright = (1 + upright) / 2
         stand_reward = (3*standing + upright) / 4
-        forward_velocity = self._get_velocity()[0]
-        print(forward_velocity)
+        velocity = self._get_velocity()
+
+        side_v = abs(velocity[1])
+        lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
+
         velocity_reward = tolerance(
-            forward_velocity,
+            velocity[0],
             bounds=(1, float('inf')),
             margin=0.5
         )
-        return stand_reward * (5*velocity_reward + 1) / 6
+        total_reward = stand_reward * (5*velocity_reward + 1) / 6
+        return total_reward * lateral_penalty
 
     def step(self, action):
         action = action.clip(-1, 1)
