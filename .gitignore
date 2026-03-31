@@ -5,3 +5,4 @@ test*.png
 __pycache__/
 gnoci_gym.egg-info/
 .env
+./desc/*

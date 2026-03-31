@@ -13,8 +13,6 @@ gym.register(
     kwargs={
         'env_rate': 0.005,
         'initial_randomness': 0.6,
-        'motor_gear_range': (0.5, 1.5),
-        'motor_gear_noise': 0.01,
         'inertial_mass_range': (0.04, 0.06),
         'inertial_mass_noise': 0.01,
     }
@@ -43,7 +41,7 @@ for i in tqdm(range(100)):
     action = np.random.uniform(-1, 1, env.action_space.shape[0])
     # action = np.array([1,1,1,1,1,1])
     state, reward, done, truncated, _ = env.step(action)
-    body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "root")
+    body_id = mujoco.mj_name2id(env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, "hor_rot_body_joint")
     xmat = env.unwrapped.data.xmat[body_id]
     z_axis = np.array([xmat[6], xmat[7], xmat[8]])
     dot = np.dot(z_axis, [0, 0, 1])

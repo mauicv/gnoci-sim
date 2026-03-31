@@ -26,7 +26,10 @@ env.reset()
 
 ```
 
-![](assets/animation.gif)
-
 
 For colab notebook example see [this](https://colab.research.google.com/drive/13MDYzpxYmWT-9RKIIiF1CMuo6QNOUCGv?authuser=1).
+
+## For development:
+
+1. Use onshape-to-robot to pull down onshape data and convert to meshes and xml: `onshape-to-robot desc`
+2. Use python script to process raw onshape xml: `python process_desc.py`
