@@ -117,8 +117,8 @@ def process(src, dst):
             continue
         ref = _geom_pos(body)
 
-        toe_pos  = [0,0,0.1]
-        heel_pos = [0,0,-0.1]
+        toe_pos  = [0.01,0.02,-0.03]
+        heel_pos = [-0.01,0.02,-0.03]
 
         _add_site(body, f"{name}-toe",  toe_pos)
         _add_site(body, f"{name}-heel", heel_pos)

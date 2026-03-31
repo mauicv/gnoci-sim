@@ -31,7 +31,7 @@ For colab notebook example see [this](https://colab.research.google.com/drive/13
 
 ## For development:
 
-1. Use onshape-to-robot to pull down onshape data and convert to meshes and xml: `onshape-to-robot desc`
+1. Use onshape-to-robot to pull down onshape data and convert to meshes and xml: `onshape-to-robot onshape_export`
 2. Use python script to process raw onshape xml: `python process_desc.py`
 
 Note: the src/desc/gnoci.xml and src/desc/assets files are computer generated and shouldn't be edited manually.
