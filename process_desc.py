@@ -17,11 +17,11 @@ import xml.etree.ElementTree as ET
 
 # ── tuneable constants ────────────────────────────────────────────────────────
 
-SRC          = "desc/robot.xml"
+SRC          = "onshape_export/robot.xml"
 DST          = "src/gnoci_gym/desc/gnoci.xml"
-ASSETS_SRC   = "desc/assets"
+ASSETS_SRC   = "onshape_export/assets"
 ASSETS_DST   = "src/gnoci_gym/desc/assets"
-SCENE_SRC    = "desc/scene.xml"
+SCENE_SRC    = "onshape_export/scene.xml"
 SCENE_DST    = "src/gnoci_gym/desc/scene.xml"
 
 # Bodies whose name contains this string are treated as feet
@@ -44,7 +44,6 @@ def _geom_pos(body):
             raw = geom.get("pos", "0 0 0")
             return [float(v) for v in raw.split()]
     return [0.0, 0.0, 0.0]
-
 
 def _add_site(body, name, pos):
     site = ET.SubElement(body, "site")
@@ -79,6 +78,15 @@ def process(src, dst):
     tree = ET.parse(src)
     root = tree.getroot()
 
+    # ── collision friction ────────────────────────────────────────────────────
+    for default in root.iter("default"):
+        if default.get("class") == "collision":
+            geom = default.find("geom")
+            if geom is None:
+                geom = ET.SubElement(default, "geom")
+            geom.set("friction", "1.0 0.005 0.0001")
+            break
+
     # ── joint position sensors ────────────────────────────────────────────────
     sensor_el = root.find("sensor")
     if sensor_el is None:
@@ -107,10 +115,10 @@ def process(src, dst):
         name = body.get("name", "")
         if FOOT_PATTERN not in name:
             continue
-
         ref = _geom_pos(body)
-        toe_pos  = [ref[0] + TOUCH_OFFSET, ref[1], ref[2]]
-        heel_pos = [ref[0] - TOUCH_OFFSET, ref[1], ref[2]]
+
+        toe_pos  = [0,0,0.1]
+        heel_pos = [0,0,-0.1]
 
         _add_site(body, f"{name}-toe",  toe_pos)
         _add_site(body, f"{name}-heel", heel_pos)
@@ -131,6 +139,7 @@ def process(src, dst):
     if actuator_el is not None:
         for actuator in actuator_el:
             actuator.set("class", ACTUATOR_CLASS)
+            actuator.attrib.pop("inheritrange", None)  # conflicts with ctrlrange
             actuator.set("ctrlrange", "-1.5708 1.5708")
 
     # ── write output ──────────────────────────────────────────────────────────

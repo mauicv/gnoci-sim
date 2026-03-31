@@ -8,15 +8,15 @@ from .load_xml import _load_and_perturb_basic_xml
 _STANDING_HEIGHT = 0.1  # TODO: calibrate once robot is simulating
 
 _JOINT_NAMES = [
-    'hip_lat_hip_rot',
-    'lat_hip_rot_vert_hip_rot',
-    'vert_hip_rot_upper_leg',
-    'upper_leg_lower_leg',
-    'lower_leg_foot',
-    'r_hip_lat_rot',
-    'r_hip_vert_hip_rot',
-    'r_vert_hip_rot_upper_leg',
-    'r_upper_leg_lower_leg',
+    'l_hip_l_lat_rot',
+    'l_hip_l_vert_rot',
+    'l_vert_rot_l_upper_leg',
+    'l_upper_leg_l_lower_leg',
+    'l_lower_leg_l_foot',
+    'r_hip_r_lat_rot',
+    'r_hip_r_vert_rot',
+    'r_vert_rot_r_upper_leg',
+    'r_upper_leg_r_lower_leg',
     'r_lower_leg_r_foot',
 ]
 

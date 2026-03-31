@@ -2,35 +2,56 @@
 """
 Interactive viewer for testing position actuators.
 
-Open the "Controls" panel in the viewer to drag actuator sliders.
-Press R to reset the simulation.
+Uses the MuJoCo built-in viewer controls:
+  Space      — pause / resume
+  Backspace  — reset simulation
+  Ctrl+A     — toggle actuator controls panel
+  F1         — help overlay
+
+Examples:
+  python3 viewer.py
+  python3 viewer.py --no-gravity
+  python3 viewer.py --gravity 0 0 -4.9
+  python3 viewer.py --timestep 0.001
 """
 
+import argparse
 import mujoco
 import mujoco.viewer
 from src.gnoci_gym import GnociGymEnv
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--no-gravity", action="store_true",
+                        help="Disable gravity (sets to 0 0 0)")
+    parser.add_argument("--gravity", nargs=3, type=float, metavar=("X", "Y", "Z"),
+                        help="Set gravity vector, e.g. --gravity 0 0 -4.9")
+    parser.add_argument("--timestep", type=float,
+                        help="Override simulation timestep (seconds)")
+    return parser.parse_args()
+
+
+def apply_overrides(model, args):
+    if args.no_gravity:
+        model.opt.gravity[:] = [0, 0, 0]
+        print("Gravity: disabled")
+    elif args.gravity:
+        model.opt.gravity[:] = args.gravity
+        print(f"Gravity: {args.gravity}")
+
+    if args.timestep:
+        model.opt.timestep = args.timestep
+        print(f"Timestep: {args.timestep}")
+
+
 def main():
+    args = parse_args()
     env = GnociGymEnv()
     env.reset(seed=0)
-
-    reset_requested = [False]
-
-    def key_callback(keycode):
-        if chr(keycode) == 'R':
-            reset_requested[0] = True
-
-    with mujoco.viewer.launch_passive(
-        env.model, env.data, key_callback=key_callback
-    ) as viewer:
-        while viewer.is_running():
-            if reset_requested[0]:
-                mujoco.mj_resetData(env.model, env.data)
-                reset_requested[0] = False
-
-            mujoco.mj_step(env.model, env.data)
-            viewer.sync()
+    apply_overrides(env.model, args)
+    mujoco.viewer.launch(env.model, env.data)
 
 
 if __name__ == '__main__':
