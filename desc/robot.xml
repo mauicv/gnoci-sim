@@ -1,0 +1,224 @@
+<?xml version="1.0" ?>
+<!-- Generated using onshape-to-robot -->
+<!-- Onshape https://cad.onshape.com/documents/1086eec806492e655aee3d36/w/7ead37efbdf3ca071e6ea4b2/e/281eb8c3a9d8c66f38369e15 -->
+<mujoco model="desc">
+  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+  <default>
+    <default class="desc">
+      <joint frictionloss="0.1" armature="0.005"/>
+      <position kp="50" dampratio="1"/>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision">
+        <geom group="3"/>
+      </default>
+    </default>
+  </default>
+  <worldbody>
+    <!-- Link hor_rot_body_joint -->
+    <body name="hor_rot_body_joint" pos="0 0 0" quat="1 0 0 0" childclass="desc">
+      <freejoint name="hor_rot_body_joint_freejoint"/>
+      <inertial pos="0.00593595 0.0210036 0.0166446" mass="0.205" fullinertia="0.000144034 0.000149785 0.000149433 -7.314e-09 5.7349e-08 -1.71145e-06"/>
+      <!-- Part hor_rot_body_joint -->
+      <geom type="mesh" class="visual" pos="-0.00193299 0.0210422 -0.0160235" quat="0.999928 0.010544 0.00562891 -0.00110178" mesh="hor_rot_body_joint" material="hor_rot_body_joint_material"/>
+      <geom type="mesh" class="collision" pos="-0.00193299 0.0210422 -0.0160235" quat="0.999928 0.010544 0.00562891 -0.00110178" mesh="hor_rot_body_joint" material="hor_rot_body_joint_material"/>
+      <!-- Part servo_1_mirrored -->
+      <geom type="mesh" class="visual" pos="0.0130647 0.0209163 -0.0162947" quat="0.00562891 -0.00110178 -0.999928 -0.010544" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+      <geom type="mesh" class="collision" pos="0.0130647 0.0209163 -0.0162947" quat="0.00562891 -0.00110178 -0.999928 -0.010544" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+      <!-- Part hor_rot_body_joint_mirrored -->
+      <geom type="mesh" class="visual" pos="0.013066 0.0210109 -0.0161927" quat="0.00562891 -0.00110178 -0.999928 -0.010544" mesh="hor_rot_body_joint_mirrored" material="hor_rot_body_joint_mirrored_material"/>
+      <geom type="mesh" class="collision" pos="0.013066 0.0210109 -0.0161927" quat="0.00562891 -0.00110178 -0.999928 -0.010544" mesh="hor_rot_body_joint_mirrored" material="hor_rot_body_joint_mirrored_material"/>
+      <!-- Part servo_1 -->
+      <geom type="mesh" class="visual" pos="-0.00193433 0.0209475 -0.0161255" quat="0.999928 0.010544 0.00562891 -0.00110178" mesh="servo_1" material="servo_1_material"/>
+      <geom type="mesh" class="collision" pos="-0.00193433 0.0209475 -0.0161255" quat="0.999928 0.010544 0.00562891 -0.00110178" mesh="servo_1" material="servo_1_material"/>
+      <!-- Link lat_hip_rotor -->
+      <body name="lat_hip_rotor" pos="0.0511752 0.0201519 0.0157702" quat="0.999928 0.010544 0.00562891 -0.00110178">
+        <!-- Joint from hor_rot_body_joint to lat_hip_rotor -->
+        <joint axis="0 0 1" name="hip_lat_hip_rot" type="hinge"/>
+        <inertial pos="-0.00428697 -0.00382409 -0.0126357" mass="0.0155303" fullinertia="2.37909e-06 2.50246e-06 2.59945e-06 -8.0327e-08 3.5083e-08 3.2124e-08"/>
+        <!-- Part lat_hip_rotor -->
+        <geom type="mesh" class="visual" pos="-0.0527479 -8.95e-10 -0.0321" quat="1 -0 -0 8.48e-09" mesh="lat_hip_rotor" material="lat_hip_rotor_material"/>
+        <geom type="mesh" class="collision" pos="-0.0527479 -8.95e-10 -0.0321" quat="1 -0 -0 8.48e-09" mesh="lat_hip_rotor" material="lat_hip_rotor_material"/>
+        <!-- Part servo_2 -->
+        <geom type="mesh" class="visual" pos="-0.0527479 -8.95e-10 -0.0321" quat="1 0 -0 8.48e-09" mesh="servo_2" material="servo_2_material"/>
+        <geom type="mesh" class="collision" pos="-0.0527479 -8.95e-10 -0.0321" quat="1 0 -0 8.48e-09" mesh="servo_2" material="servo_2_material"/>
+        <!-- Part mm_lat_hip_rotor -->
+        <geom type="mesh" class="visual" pos="-0.0528345 4.99991e-05 -0.0321" quat="1 -0 -0 8.48e-09" mesh="mm_lat_hip_rotor" material="mm_lat_hip_rotor_material"/>
+        <geom type="mesh" class="collision" pos="-0.0528345 4.99991e-05 -0.0321" quat="1 -0 -0 8.48e-09" mesh="mm_lat_hip_rotor" material="mm_lat_hip_rotor_material"/>
+        <!-- Link vert_rot_hip -->
+        <body name="vert_rot_hip" pos="0.00109071 0.023 -0.0121" quat="0.707107 -0.707107 3.809e-08 5.0083e-08">
+          <!-- Joint from lat_hip_rotor to vert_rot_hip -->
+          <joint axis="0 0 1" name="lat_hip_rot_vert_hip_rot" type="hinge"/>
+          <inertial pos="0.0334167 -0.0052005 -0.0248316" mass="0.0358461" fullinertia="1.1549e-05 2.28216e-05 1.99117e-05 1.71255e-06 -1.85099e-06 3.32353e-07"/>
+          <!-- Part mm_vert_rot_hip -->
+          <geom type="mesh" class="visual" pos="-0.0538386 0.02 -0.023" quat="0.707107 0.707107 -0 -0" mesh="mm_vert_rot_hip" material="mm_vert_rot_hip_material"/>
+          <geom type="mesh" class="collision" pos="-0.0538386 0.02 -0.023" quat="0.707107 0.707107 -0 -0" mesh="mm_vert_rot_hip" material="mm_vert_rot_hip_material"/>
+          <!-- Part vert_rot_hip -->
+          <geom type="mesh" class="visual" pos="-0.0538386 0.02 -0.023" quat="0.707107 0.707107 -0 0" mesh="vert_rot_hip" material="vert_rot_hip_material"/>
+          <geom type="mesh" class="collision" pos="-0.0538386 0.02 -0.023" quat="0.707107 0.707107 -0 0" mesh="vert_rot_hip" material="vert_rot_hip_material"/>
+          <!-- Part servo_3 -->
+          <geom type="mesh" class="visual" pos="-0.0538386 0.0199038 -0.023" quat="0.707107 0.707107 -0 0" mesh="servo_3" material="servo_3_material"/>
+          <geom type="mesh" class="collision" pos="-0.0538386 0.0199038 -0.023" quat="0.707107 0.707107 -0 0" mesh="servo_3" material="servo_3_material"/>
+          <!-- Link upper_leg -->
+          <body name="upper_leg" pos="0.043 0.0054232 -0.023" quat="0 -0.707107 0 -0.707107">
+            <!-- Joint from vert_rot_hip to upper_leg -->
+            <joint axis="0 0 1" name="vert_hip_rot_upper_leg" type="hinge"/>
+            <inertial pos="-2.65264e-06 -0.034094 -0.00876669" mass="0.0699906" fullinertia="4.88668e-05 1.08625e-05 4.94636e-05 -4.563e-09 -9.7e-11 -2.76551e-06"/>
+            <!-- Part mm_upper_leg -->
+            <geom type="mesh" class="visual" pos="-0.0124979 -0.00726417 -0.0968386" quat="0.182982 -0.683021 -0.182982 -0.683021" mesh="mm_upper_leg" material="mm_upper_leg_material"/>
+            <geom type="mesh" class="collision" pos="-0.0124979 -0.00726417 -0.0968386" quat="0.182982 -0.683021 -0.182982 -0.683021" mesh="mm_upper_leg" material="mm_upper_leg_material"/>
+            <!-- Part upper_leg -->
+            <geom type="mesh" class="visual" pos="-1.32164e-06 -0.0144806 -0.0968386" quat="0.499977 -0.500023 -0.499977 -0.500023" mesh="upper_leg" material="upper_leg_material"/>
+            <geom type="mesh" class="collision" pos="-1.32164e-06 -0.0144806 -0.0968386" quat="0.499977 -0.500023 -0.499977 -0.500023" mesh="upper_leg" material="upper_leg_material"/>
+            <!-- Part servo_4 -->
+            <geom type="mesh" class="visual" pos="-1.30289e-06 -0.0142752 -0.0968386" quat="0.499977 -0.500023 -0.499977 -0.500023" mesh="servo_4" material="servo_4_material"/>
+            <geom type="mesh" class="collision" pos="-1.30289e-06 -0.0142752 -0.0968386" quat="0.499977 -0.500023 -0.499977 -0.500023" mesh="servo_4" material="servo_4_material"/>
+            <!-- Link lower_leg -->
+            <body name="lower_leg" pos="-6.82649e-06 -0.0747946 -0.012" quat="1 0 0 -4.56349e-05">
+              <!-- Joint from upper_leg to lower_leg -->
+              <joint axis="0 0 1" name="upper_leg_lower_leg" type="hinge"/>
+              <inertial pos="-0.00131472 -0.0494415 0.00184604" mass="0.0690184" fullinertia="4.62636e-05 9.92145e-06 4.72727e-05 -2.78149e-06 -4.954e-08 1.88075e-06"/>
+              <!-- Part lower_leg -->
+              <geom type="mesh" class="visual" pos="0 0.0605194 -0.0848386" quat="0.5 -0.5 -0.5 -0.5" mesh="lower_leg" material="lower_leg_material"/>
+              <geom type="mesh" class="collision" pos="0 0.0605194 -0.0848386" quat="0.5 -0.5 -0.5 -0.5" mesh="lower_leg" material="lower_leg_material"/>
+              <!-- Part mm_lower_leg -->
+              <geom type="mesh" class="visual" pos="-0.0521082 0.0300847 -0.0847386" quat="0.683013 -0.183013 -0.683013 -0.183013" mesh="mm_lower_leg" material="mm_lower_leg_material"/>
+              <geom type="mesh" class="collision" pos="-0.0521082 0.0300847 -0.0847386" quat="0.683013 -0.183013 -0.683013 -0.183013" mesh="mm_lower_leg" material="mm_lower_leg_material"/>
+              <!-- Part servo_5 -->
+              <geom type="mesh" class="visual" pos="0 0.0605239 -0.0845886" quat="0.5 -0.5 -0.5 -0.5" mesh="servo_5" material="servo_5_material"/>
+              <geom type="mesh" class="collision" pos="0 0.0605239 -0.0845886" quat="0.5 -0.5 -0.5 -0.5" mesh="servo_5" material="servo_5_material"/>
+              <!-- Link foot -->
+              <body name="foot" pos="0 -0.085 0.0175" quat="0 1 -0 0">
+                <!-- Joint from lower_leg to foot -->
+                <joint axis="0 0 1" name="lower_leg_foot" type="hinge"/>
+                <inertial pos="-6.30262e-05 0.016939 0.0187992" mass="0.0355652" fullinertia="8.98359e-06 1.48185e-05 9.36648e-06 -1.0674e-08 -1.227e-09 -1.8862e-07"/>
+                <!-- Part foot -->
+                <geom type="mesh" class="visual" pos="-0 -0.145519 0.102339" quat="0.5 0.5 0.5 -0.5" mesh="foot" material="foot_material"/>
+                <geom type="mesh" class="collision" pos="-0 -0.145519 0.102339" quat="0.5 0.5 0.5 -0.5" mesh="foot" material="foot_material"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      <!-- Link lat_hip_rotor_mirrored -->
+      <body name="lat_hip_rotor_mirrored" pos="-0.0393146 0.0203405 0.0167911" quat="0.00562891 -0.00110177 -0.999928 -0.010544">
+        <!-- Joint from hor_rot_body_joint to lat_hip_rotor_mirrored -->
+        <joint axis="0 0 1" name="r_hip_lat_rot" type="hinge"/>
+        <inertial pos="-0.00447435 -0.00399691 0.0122043" mass="0.0148671" fullinertia="2.29632e-06 2.41786e-06 2.56995e-06 -6.9053e-08 -6.94e-09 -6.168e-09"/>
+        <!-- Part servo_2_mirrored -->
+        <geom type="mesh" class="visual" pos="-0.0527479 0 0.0321" quat="1 0 0 -0" mesh="servo_2_mirrored" material="servo_2_mirrored_material"/>
+        <geom type="mesh" class="collision" pos="-0.0527479 0 0.0321" quat="1 0 0 -0" mesh="servo_2_mirrored" material="servo_2_mirrored_material"/>
+        <!-- Part lat_hip_rotor_mirrored -->
+        <geom type="mesh" class="visual" pos="-0.0527479 0 0.0321" quat="1 0 0 -0" mesh="lat_hip_rotor_mirrored" material="lat_hip_rotor_mirrored_material"/>
+        <geom type="mesh" class="collision" pos="-0.0527479 0 0.0321" quat="1 0 0 -0" mesh="lat_hip_rotor_mirrored" material="lat_hip_rotor_mirrored_material"/>
+        <!-- Link vert_rot_hip_mirrored -->
+        <body name="vert_rot_hip_mirrored" pos="0.00109071 0.025 0.0121" quat="0.707107 -0.707107 4.4087e-08 4.4087e-08">
+          <!-- Joint from lat_hip_rotor_mirrored to vert_rot_hip_mirrored -->
+          <joint axis="0 0 1" name="r_hip_vert_hip_rot" type="hinge"/>
+          <inertial pos="0.0339266 0.00527985 -0.0264822" mass="0.0353074" fullinertia="1.12425e-05 2.19192e-05 1.92796e-05 -1.6175e-06 -1.43257e-06 -2.67236e-07"/>
+          <!-- Part servo_1_mirrored_2 -->
+          <geom type="mesh" class="visual" pos="0.0105 -0.00551938 -0.0777479" quat="0.707107 0 -0.707107 -0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+          <geom type="mesh" class="collision" pos="0.0105 -0.00551938 -0.0777479" quat="0.707107 0 -0.707107 -0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+          <!-- Part vert_rot_hip_mirrored -->
+          <geom type="mesh" class="visual" pos="-0.0538386 -0.02 -0.025" quat="0.707107 0.707107 0 -0" mesh="vert_rot_hip_mirrored" material="vert_rot_hip_mirrored_material"/>
+          <geom type="mesh" class="collision" pos="-0.0538386 -0.02 -0.025" quat="0.707107 0.707107 0 -0" mesh="vert_rot_hip_mirrored" material="vert_rot_hip_mirrored_material"/>
+          <!-- Link upper_leg_mirrored -->
+          <body name="upper_leg_mirrored" pos="0.043 -0.00551938 -0.025" quat="3.22687e-05 -0.707107 3.22687e-05 -0.707107">
+            <!-- Joint from vert_rot_hip_mirrored to upper_leg_mirrored -->
+            <joint axis="0 0 1" name="r_vert_hip_rot_upper_leg" type="hinge"/>
+            <inertial pos="-0 0.0344591 -0.0087149" mass="0.0692485" fullinertia="4.79689e-05 1.08353e-05 4.85853e-05 -0 0 2.88901e-06"/>
+            <!-- Part servo_1_mirrored_3 -->
+            <geom type="mesh" class="visual" pos="-0.0527479 0.075 -0.04485" quat="0 1 -0 0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+            <geom type="mesh" class="collision" pos="-0.0527479 0.075 -0.04485" quat="0 1 -0 0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+            <!-- Part upper_leg_mirrored -->
+            <geom type="mesh" class="visual" pos="0 0.0144806 -0.0968386" quat="0.5 -0.5 -0.5 -0.5" mesh="upper_leg_mirrored" material="upper_leg_mirrored_material"/>
+            <geom type="mesh" class="collision" pos="0 0.0144806 -0.0968386" quat="0.5 -0.5 -0.5 -0.5" mesh="upper_leg_mirrored" material="upper_leg_mirrored_material"/>
+            <!-- Link lower_leg_mirrored -->
+            <body name="lower_leg_mirrored" pos="0 0.075 -0.01235" quat="1 -0 0 0">
+              <!-- Joint from upper_leg_mirrored to lower_leg_mirrored -->
+              <joint axis="0 0 1" name="r_upper_leg_lower_leg" type="hinge"/>
+              <inertial pos="-0.0013205 0.0496176 0.00186147" mass="0.0687726" fullinertia="4.56586e-05 9.91473e-06 4.66713e-05 2.76183e-06 -5.1263e-08 -1.82827e-06"/>
+              <!-- Part servo_1_mirrored_4 -->
+              <geom type="mesh" class="visual" pos="-0.0527479 0.085 -0.0595" quat="0 -1 0 -0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+              <geom type="mesh" class="collision" pos="-0.0527479 0.085 -0.0595" quat="0 -1 0 -0" mesh="servo_1_mirrored" material="servo_1_mirrored_material"/>
+              <!-- Part lower_leg_mirrored -->
+              <geom type="mesh" class="visual" pos="0 -0.0605194 -0.0848386" quat="0.5 -0.5 -0.5 -0.5" mesh="lower_leg_mirrored" material="lower_leg_mirrored_material"/>
+              <geom type="mesh" class="collision" pos="0 -0.0605194 -0.0848386" quat="0.5 -0.5 -0.5 -0.5" mesh="lower_leg_mirrored" material="lower_leg_mirrored_material"/>
+              <!-- Link foot_mirrored -->
+              <body name="foot_mirrored" pos="0 0.085 -0.025" quat="0 1 0 0">
+                <!-- Joint from lower_leg_mirrored to foot_mirrored -->
+                <joint axis="0 0 1" name="r_lower_leg_r_foot" type="hinge"/>
+                <inertial pos="-6.30268e-05 -0.0168866 -0.0227008" mass="0.0355652" fullinertia="8.98359e-06 1.48185e-05 9.36648e-06 1.0676e-08 -1.235e-09 1.8862e-07"/>
+                <!-- Part foot_mirrored -->
+                <geom type="mesh" class="visual" pos="-0 0.145572 0.0608386" quat="0.5 0.5 0.5 -0.5" mesh="foot_mirrored" material="foot_mirrored_material"/>
+                <geom type="mesh" class="collision" pos="-0 0.145572 0.0608386" quat="0.5 0.5 0.5 -0.5" mesh="foot_mirrored" material="foot_mirrored_material"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <asset>
+    <mesh file="vert_rot_hip_mirrored.stl"/>
+    <mesh file="mm_lower_leg.stl"/>
+    <mesh file="foot.stl"/>
+    <mesh file="servo_1_mirrored.stl"/>
+    <mesh file="servo_4.stl"/>
+    <mesh file="servo_1.stl"/>
+    <mesh file="vert_rot_hip.stl"/>
+    <mesh file="servo_5.stl"/>
+    <mesh file="servo_2_mirrored.stl"/>
+    <mesh file="hor_rot_body_joint.stl"/>
+    <mesh file="lat_hip_rotor_mirrored.stl"/>
+    <mesh file="mm_vert_rot_hip.stl"/>
+    <mesh file="lower_leg_mirrored.stl"/>
+    <mesh file="mm_upper_leg.stl"/>
+    <mesh file="hor_rot_body_joint_mirrored.stl"/>
+    <mesh file="lower_leg.stl"/>
+    <mesh file="foot_mirrored.stl"/>
+    <mesh file="servo_2.stl"/>
+    <mesh file="upper_leg_mirrored.stl"/>
+    <mesh file="servo_3.stl"/>
+    <mesh file="upper_leg.stl"/>
+    <mesh file="lat_hip_rotor.stl"/>
+    <mesh file="mm_lat_hip_rotor.stl"/>
+    <material name="hor_rot_body_joint_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_1_mirrored_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="hor_rot_body_joint_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_1_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="lat_hip_rotor_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_2_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="mm_lat_hip_rotor_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="mm_vert_rot_hip_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="vert_rot_hip_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_3_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="mm_upper_leg_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="upper_leg_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_4_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="lower_leg_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="mm_lower_leg_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_5_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="foot_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="servo_2_mirrored_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="lat_hip_rotor_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="vert_rot_hip_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="upper_leg_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="lower_leg_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+    <material name="foot_mirrored_material" rgba="0.768627 0.886275 0.952941 1"/>
+  </asset>
+  <actuator>
+    <position class="desc" name="hip_lat_hip_rot" joint="hip_lat_hip_rot"/>
+    <position class="desc" name="lat_hip_rot_vert_hip_rot" joint="lat_hip_rot_vert_hip_rot"/>
+    <position class="desc" name="vert_hip_rot_upper_leg" joint="vert_hip_rot_upper_leg"/>
+    <position class="desc" name="upper_leg_lower_leg" joint="upper_leg_lower_leg"/>
+    <position class="desc" name="lower_leg_foot" joint="lower_leg_foot"/>
+    <position class="desc" name="r_hip_lat_rot" joint="r_hip_lat_rot"/>
+    <position class="desc" name="r_hip_vert_hip_rot" joint="r_hip_vert_hip_rot"/>
+    <position class="desc" name="r_vert_hip_rot_upper_leg" joint="r_vert_hip_rot_upper_leg"/>
+    <position class="desc" name="r_upper_leg_lower_leg" joint="r_upper_leg_lower_leg"/>
+    <position class="desc" name="r_lower_leg_r_foot" joint="r_lower_leg_r_foot"/>
+  </actuator>
+  <equality/>
+</mujoco>
