@@ -1,6 +1,11 @@
 <mujoco model="scene">
     <option timestep="0.005" gravity="0 0 -9.8"/>
     <include file="src/gnoci_gym/desc/gnoci.xml" />
+    <default>
+        <default class="hps0618sg">
+            <position kp="4.0" forcerange="-0.588 0.588" ctrllimited="true" forcelimited="true"/>
+        </default>
+    </default>
 
     <visual>
         <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />

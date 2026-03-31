@@ -33,6 +33,8 @@ TOUCH_OFFSET = 0.02   # metres
 
 SITE_SIZE = 0.01      # metres
 
+ACTUATOR_CLASS = "hps0618sg"  # class added to every actuator
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _geom_pos(body):
@@ -123,6 +125,13 @@ def process(src, dst):
     for child in root.findall('compiler'):
         child.attrib['meshdir'] = str(os.path.join('src', 'gnoci_gym', 'desc', 'assets'))
 
+
+    # ── actuator class ───────────────────────────────────────────────────────
+    actuator_el = root.find("actuator")
+    if actuator_el is not None:
+        for actuator in actuator_el:
+            actuator.set("class", ACTUATOR_CLASS)
+            actuator.set("ctrlrange", "-1.5708 1.5708")
 
     # ── write output ──────────────────────────────────────────────────────────
     _indent(root)

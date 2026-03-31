@@ -164,16 +164,16 @@
     <material name="foot_mirrored_material" rgba="0.768627 0.886275 0.952941 1" />
   </asset>
   <actuator>
-    <position class="desc" name="hip_lat_hip_rot" joint="hip_lat_hip_rot" />
-    <position class="desc" name="lat_hip_rot_vert_hip_rot" joint="lat_hip_rot_vert_hip_rot" />
-    <position class="desc" name="vert_hip_rot_upper_leg" joint="vert_hip_rot_upper_leg" />
-    <position class="desc" name="upper_leg_lower_leg" joint="upper_leg_lower_leg" />
-    <position class="desc" name="lower_leg_foot" joint="lower_leg_foot" />
-    <position class="desc" name="r_hip_lat_rot" joint="r_hip_lat_rot" />
-    <position class="desc" name="r_hip_vert_hip_rot" joint="r_hip_vert_hip_rot" />
-    <position class="desc" name="r_vert_hip_rot_upper_leg" joint="r_vert_hip_rot_upper_leg" />
-    <position class="desc" name="r_upper_leg_lower_leg" joint="r_upper_leg_lower_leg" />
-    <position class="desc" name="r_lower_leg_r_foot" joint="r_lower_leg_r_foot" />
+    <position class="hps0618sg" name="hip_lat_hip_rot" joint="hip_lat_hip_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="lat_hip_rot_vert_hip_rot" joint="lat_hip_rot_vert_hip_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="vert_hip_rot_upper_leg" joint="vert_hip_rot_upper_leg" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="upper_leg_lower_leg" joint="upper_leg_lower_leg" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="lower_leg_foot" joint="lower_leg_foot" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="r_hip_lat_rot" joint="r_hip_lat_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="r_hip_vert_hip_rot" joint="r_hip_vert_hip_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="r_vert_hip_rot_upper_leg" joint="r_vert_hip_rot_upper_leg" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="r_upper_leg_lower_leg" joint="r_upper_leg_lower_leg" ctrlrange="-1.5708 1.5708" />
+    <position class="hps0618sg" name="r_lower_leg_r_foot" joint="r_lower_leg_r_foot" ctrlrange="-1.5708 1.5708" />
   </actuator>
   <equality />
   <sensor>
