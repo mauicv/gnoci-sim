@@ -164,13 +164,13 @@
     <material name="foot_mirrored_material" rgba="0.768627 0.886275 0.952941 1" />
   </asset>
   <actuator>
-    <position class="hps0618sg" name="l_hip_l_lat_rot" joint="l_hip_l_lat_rot" ctrlrange="-1.5708 1.5708" />
-    <position class="hps0618sg" name="l_hip_l_vert_rot" joint="l_hip_l_vert_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="miuzei_25kg" name="l_hip_l_lat_rot" joint="l_hip_l_lat_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="miuzei_25kg" name="l_hip_l_vert_rot" joint="l_hip_l_vert_rot" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="l_vert_rot_l_upper_leg" joint="l_vert_rot_l_upper_leg" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="l_upper_leg_l_lower_leg" joint="l_upper_leg_l_lower_leg" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="l_lower_leg_l_foot" joint="l_lower_leg_l_foot" ctrlrange="-1.5708 1.5708" />
-    <position class="hps0618sg" name="r_hip_r_lat_rot" joint="r_hip_r_lat_rot" ctrlrange="-1.5708 1.5708" />
-    <position class="hps0618sg" name="r_hip_r_vert_rot" joint="r_hip_r_vert_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="miuzei_25kg" name="r_hip_r_lat_rot" joint="r_hip_r_lat_rot" ctrlrange="-1.5708 1.5708" />
+    <position class="miuzei_25kg" name="r_hip_r_vert_rot" joint="r_hip_r_vert_rot" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="r_vert_rot_r_upper_leg" joint="r_vert_rot_r_upper_leg" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="r_upper_leg_r_lower_leg" joint="r_upper_leg_r_lower_leg" ctrlrange="-1.5708 1.5708" />
     <position class="hps0618sg" name="r_lower_leg_r_foot" joint="r_lower_leg_r_foot" ctrlrange="-1.5708 1.5708" />

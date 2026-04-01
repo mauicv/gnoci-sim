@@ -5,6 +5,13 @@
         <default class="hps0618sg">
             <position kp="4.0" forcerange="-0.588 0.588" ctrllimited="true" forcelimited="true"/>
         </default>
+        <default class="miuzei_25kg">
+            <position kp="5.0"
+                    ctrlrange="-2.356 2.356"
+                    ctrllimited="true"
+                    forcerange="-2.70 2.70"
+                    forcelimited="true"/>
+        </default>
     </default>
 
     <visual>

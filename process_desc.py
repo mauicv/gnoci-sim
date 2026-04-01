@@ -33,7 +33,8 @@ TOUCH_OFFSET = 0.02   # metres
 
 SITE_SIZE = 0.01      # metres
 
-ACTUATOR_CLASS = "hps0618sg"  # class added to every actuator
+ACTUATOR_CLASS     = "hps0618sg"   # default class for all actuators
+ACTUATOR_CLASS_HIP = "miuzei_25kg" # class for hip joints (name contains "hip")
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,9 @@ def process(src, dst):
     actuator_el = root.find("actuator")
     if actuator_el is not None:
         for actuator in actuator_el:
-            actuator.set("class", ACTUATOR_CLASS)
+            joint_name = actuator.get("joint", "")
+            cls = ACTUATOR_CLASS_HIP if "hip" in joint_name else ACTUATOR_CLASS
+            actuator.set("class", cls)
             actuator.attrib.pop("inheritrange", None)  # conflicts with ctrlrange
             actuator.set("ctrlrange", "-1.5708 1.5708")
 
