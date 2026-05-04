@@ -48,7 +48,12 @@ def apply_overrides(model, args):
 
 def main():
     args = parse_args()
-    env = GnociGymEnv()
+    env = GnociGymEnv(
+        initial_randomness=0.0,
+        inertial_mass_range=(0.00, 0.00),
+        inertial_mass_noise=0.00,
+        floor_tilt_range=0.075,
+    )
     env.reset(seed=0)
     apply_overrides(env.model, args)
     mujoco.viewer.launch(env.model, env.data)

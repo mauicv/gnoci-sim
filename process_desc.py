@@ -33,25 +33,75 @@ TOUCH_OFFSET = 0.02   # metres
 
 SITE_SIZE = 0.01      # metres
 
-ACTUATOR_CLASS     = "hps0618sg"   # default class for all actuators
-ACTUATOR_CLASS_HIP = "miuzei_25kg" # class for hip joints (name contains "hip")
+ACTUATOR_CLASS = "miuzei_25kg"
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# Cutoff radius for c_sense touch sensors (metres).  Sites are ~0.052 m apart;
+# half that ensures a contact at one site can't reach the other.
+C_SENSE_CUTOFF = 0.025
 
-def _geom_pos(body):
-    """Return the pos of the first collision geom in *body*, or (0, 0, 0)."""
-    for geom in body.findall("geom"):
-        if geom.get("class") == "collision":
-            raw = geom.get("pos", "0 0 0")
-            return [float(v) for v in raw.split()]
-    return [0.0, 0.0, 0.0]
+# Meshes whose collision geoms should be stripped — sensors, servos, and
+# electronics that are rigidly mounted and only cause spurious contact forces.
+# Structural parts (frames, leg shells, feet) are intentionally absent.
+NO_COLLISION_MESHES: set[str] = {
+    # ── head electronics / cosmetics ──────────────────────────────────────────
+    "head_servo_left",    "head_servo_right",
+    "head_battery",
+    "head_fan",
+    "head_r_sense_left",  "head_r_sense_right",
+    "head_button",
+    "head_voltmeter",
+    "head_powerboard",
+    "head_r_pi",
+    "head_lid",
+    "head_base",
+    "head_main",
+    "head_midframe",
+    # ── yoke sensors / servos ─────────────────────────────────────────────────
+    "left_yoke_r_sense",  "right_yoke_r_sense",
+    "left_yoke_servo",    "right_yoke_servo",
+    "left_yoke_upper_frame", "right_yoke_upper_frame",
+    "left_yoke_lower_frame", "right_yoke_lower_frame",
+    # ── hip sensors / servos ──────────────────────────────────────────────────
+    "left_hip_servo",     "right_hip_servo",
+    "left_hip_r_sense",   "right_hip_r_sense",
+    # ── upper-leg sensors / servos ────────────────────────────────────────────
+    "left_upper_leg_servo",    "right_upper_leg_servo",
+    "left_upper_leg_r_sense",  "right_upper_leg_r_sense",
+    # ── lower-leg sensors / servos ────────────────────────────────────────────
+    "left_lower_leg_servo",    "right_lower_leg_servo",
+    "left_lower_leg_r_sense",  "right_lower_leg_r_sense",
+    "left_lower_leg_c_sense_1", "left_lower_leg_c_sense_2",
+    "right_lower_leg_c_sense_1", "right_lower_leg_c_sense_2",
+}
 
-def _add_site(body, name, pos):
-    site = ET.SubElement(body, "site")
-    site.set("name", name)
-    site.set("size", str(SITE_SIZE))
-    site.set("pos", f"{pos[0]:.6g} {pos[1]:.6g} {pos[2]:.6g}")
-    return site
+PART_MASSES: dict[str, float] = {
+    "servo": 0.063,
+    "button": 0.012,
+    "r_pi": 0.075,
+    "battery": 0.089,
+    "r_sense": 0.00001,
+    "c_sense": 0.00001,
+    "voltmeter": 0.003,
+    "fan": 0.006,
+    "power_board": 0.013,
+    "servo_horn": 0.003,
+    "head_base": 0.027,
+    "head_main": 0.08,
+    "head_top": 0.08,
+    "head_lid": 0.011,
+    "head_midframe": 0.037,
+    "yoke_upper_frame": 0.01,
+    "yoke_lower_frame": 0.02,
+    "hip_back": 0.023,
+    "hip_front": 0.036,
+    "upper_leg": 0.067,
+    "lower_leg": 0.044,
+    "foot_base": 0.023,
+    "left_foot_right_side": 0.024,
+    "left_foot_left_side": 0.037,
+    "right_foot_left_side": 0.024,
+    "right_foot_right_side": 0.037,
+}
 
 
 def _indent(elem, level=0):
@@ -79,14 +129,12 @@ def process(src, dst):
     tree = ET.parse(src)
     root = tree.getroot()
 
-    # ── collision friction ────────────────────────────────────────────────────
-    for default in root.iter("default"):
-        if default.get("class") == "collision":
-            geom = default.find("geom")
-            if geom is None:
-                geom = ET.SubElement(default, "geom")
-            geom.set("friction", "1.0 0.005 0.0001")
-            break
+    # ── freejoint on root body ────────────────────────────────────────────────
+    worldbody = root.find("worldbody")
+    root_body = worldbody.find("body")
+    freejoint = ET.Element("freejoint")
+    freejoint.set("name", "root")
+    root_body.insert(0, freejoint)
 
     # ── joint position sensors ────────────────────────────────────────────────
     sensor_el = root.find("sensor")
@@ -94,6 +142,7 @@ def process(src, dst):
         sensor_el = ET.SubElement(root, "sensor")
 
     joints_instrumented = []
+    c_sense_sites = []
     for joint in root.iter("joint"):
         jtype = joint.get("type", "hinge")
         if jtype == "free":
@@ -106,44 +155,63 @@ def process(src, dst):
         s.set("joint", name)
         joints_instrumented.append(name)
 
-    # ── foot touch sensors ────────────────────────────────────────────────────
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        raise ValueError("No <worldbody> found in source XML.")
-
-    feet_instrumented = []
-    for body in worldbody.iter("body"):
-        name = body.get("name", "")
-        if FOOT_PATTERN not in name:
-            continue
-        ref = _geom_pos(body)
-
-        toe_pos  = [0.01,0.02,-0.03]
-        heel_pos = [-0.01,0.02,-0.03]
-
-        _add_site(body, f"{name}-toe",  toe_pos)
-        _add_site(body, f"{name}-heel", heel_pos)
-
-        for suffix in ("toe", "heel"):
+    for site in root.iter("site"):
+        name = site.get("name", "")
+        if "c_sense" in name:
+            c_sense_sites.append(name)
             t = ET.SubElement(sensor_el, "touch")
-            t.set("name", f"{name}-{suffix}-contact")
-            t.set("site", f"{name}-{suffix}")
+            t.set("name", f"{name}-touch")
+            t.set("site", name)
+            t.set("cutoff", str(C_SENSE_CUTOFF))
 
-        feet_instrumented.append(name)
+    for tag, sname in [("gyro", "imu-gyro"), ("accelerometer", "imu-acc")]:
+        s = ET.SubElement(sensor_el, tag)
+        s.set("name", sname)
+        s.set("site", "imu")
 
     for child in root.findall('compiler'):
         child.attrib['meshdir'] = str(os.path.join('src', 'gnoci_gym', 'desc', 'assets'))
-
 
     # ── actuator class ───────────────────────────────────────────────────────
     actuator_el = root.find("actuator")
     if actuator_el is not None:
         for actuator in actuator_el:
-            joint_name = actuator.get("joint", "")
-            cls = ACTUATOR_CLASS_HIP if "hip" in joint_name else ACTUATOR_CLASS
-            actuator.set("class", cls)
-            actuator.attrib.pop("inheritrange", None)  # conflicts with ctrlrange
-            actuator.set("ctrlrange", "-1.5708 1.5708")
+            actuator.set("class", ACTUATOR_CLASS)
+            actuator.attrib["inheritrange"] = "1"
+            actuator.attrib.pop("ctrlrange", None)
+
+    # ── strip collision geoms for cosmetic / sensor parts ────────────────────
+    removed = 0
+    for body in root.iter("body"):
+        for geom in list(body.findall("geom")):
+            if geom.get("class") == "collision" and geom.get("mesh") in NO_COLLISION_MESHES:
+                body.remove(geom)
+                removed += 1
+
+    # ── remove explicit inertials (let MuJoCo compute from geom masses) ─────
+    for body in root.iter("body"):
+        for inertial in list(body.findall("inertial")):
+            body.remove(inertial)
+
+    # ── assign masses from PART_MASSES ──────────────────────────────────────
+    masses_set = 0
+    for geom in root.iter("geom"):
+        mesh = geom.get("mesh", "")
+        for key, mass in PART_MASSES.items():
+            if key in mesh:
+                geom.set("mass", str(mass))
+                masses_set += 1
+                break
+
+    # ── IMU site on head_base ────────────────────────────────────────────────
+    for body in root.iter("body"):
+        if body.get("name") == "head_base":
+            imu = ET.SubElement(body, "site")
+            imu.set("group", "3")
+            imu.set("name", "imu")
+            imu.set("pos", "0.0202673 -0.0559394 0.0971252")
+            imu.set("quat", "0 1 0 0")
+            break
 
     # ── write output ──────────────────────────────────────────────────────────
     _indent(root)
@@ -152,7 +220,9 @@ def process(src, dst):
 
     print(f"Written: {dst}")
     print(f"  Joints ({len(joints_instrumented)}): {', '.join(joints_instrumented)}")
-    print(f"  Feet   ({len(feet_instrumented)}): {', '.join(feet_instrumented)}")
+    print(f"  Collision geoms removed: {removed}")
+    print(f"  Geom masses assigned:   {masses_set}")
+    print(f"  Touch sensors added:    {len(c_sense_sites)} ({', '.join(c_sense_sites)})")
 
 
 def copy_assets(assets_src, assets_dst):

@@ -2,12 +2,8 @@
     <option timestep="0.005" gravity="0 0 -9.8"/>
     <include file="src/gnoci_gym/desc/gnoci.xml" />
     <default>
-        <default class="hps0618sg">
-            <position kp="4.0" forcerange="-0.588 0.588" ctrllimited="true" forcelimited="true"/>
-        </default>
         <default class="miuzei_25kg">
             <position kp="5.0"
-                    ctrlrange="-2.356 2.356"
                     ctrllimited="true"
                     forcerange="-2.70 2.70"
                     forcelimited="true"/>
@@ -32,8 +28,8 @@
 
     <worldbody>
         <light pos="0 0 3.5" dir="0 0 -0.1" directional="true" />
-        <camera name="track" mode="trackcom" pos="-0.25 -0.25 0.375" 
+        <camera name="track" mode="trackcom" pos="-0.5 -0.5 0.35"
             xyaxes="0.7071 -0.7071 0 0.4082 0.4082 0.8165"/>
-        <geom name="floor" size="0 0 0.05" pos="0 0 -0.2" type="plane" material="groundplane" friction="1.0 0.005 0.0001"/>
+        <geom name="floor" size="0 0 0.05" pos="0 0 -0.240" type="plane" material="groundplane" friction="1.0 0.005 0.0001"/>
     </worldbody>
 </mujoco>

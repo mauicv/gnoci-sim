@@ -5,6 +5,4 @@ test*.png
 __pycache__/
 gnoci_gym.egg-info/
 .env
-onshape_export/assets/
-onshape_export/robot.xml
-onshape_export/scene.xml
+ose.bu

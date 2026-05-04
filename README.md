@@ -23,7 +23,6 @@ for i in tqdm(range(100)):
     state, reward, done, truncated, _ = env.step(action)
 
 env.reset()
-
 ```
 
 

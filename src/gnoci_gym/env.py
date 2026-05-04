@@ -5,26 +5,39 @@ import os
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 
-_STANDING_HEIGHT = 0.1  # TODO: calibrate once robot is simulating
+_STANDING_HEIGHT = 0.235  # TODO: calibrate once robot is simulating
 
 _JOINT_NAMES = [
-    'l_hip_l_lat_rot',
-    'l_hip_l_vert_rot',
-    'l_vert_rot_l_upper_leg',
-    'l_upper_leg_l_lower_leg',
-    'l_lower_leg_l_foot',
-    'r_hip_r_lat_rot',
-    'r_hip_r_vert_rot',
-    'r_vert_rot_r_upper_leg',
-    'r_upper_leg_r_lower_leg',
-    'r_lower_leg_r_foot',
+    'head__left_yoke',
+    'left_yoke__hip',
+    'left_hip__upper_leg',
+    'left_upper_leg__lower_leg',
+    'left_lower_leg__foot',
+    'head__right_yoke',
+    'right_yoke__hip',
+    'right_hip__upper_leg',
+    'right_upper_leg__lower_leg',
+    'right_lower_leg__foot',
 ]
 
+_DEFAULT_JOINT_POSITIONS: dict[str, float] = {
+    "head__left_yoke":            None,
+    "left_yoke__hip":             None,
+    "left_hip__upper_leg":        -0.6,
+    "left_upper_leg__lower_leg":  1.4,
+    "left_lower_leg__foot":       0.75,
+    "head__right_yoke":           None,
+    "right_yoke__hip":            None,
+    "right_hip__upper_leg":        0.6,
+    "right_upper_leg__lower_leg":  -1.4,
+    "right_lower_leg__foot":       -0.75,
+}
+
 _TOUCH_SENSOR_NAMES = [
-    'foot-toe-contact',
-    'foot-heel-contact',
-    'foot_mirrored-toe-contact',
-    'foot_mirrored-heel-contact',
+    "forward_left_c_sense-touch",
+    "back_left_c_sense-touch",
+    "forward_right_c_sense-touch",
+    "back_right_c_sense-touch",
 ]
 
 _N_JOINTS = len(_JOINT_NAMES)   # 10
@@ -39,12 +52,13 @@ class GnociGymEnv(gym.Env):
 
     def __init__(
             self,
-            camera=-1,
+            camera='track',
             render_mode='rgb_array',
             env_rate=0.005,
-            initial_randomness=0.6,
+            initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
             inertial_mass_noise=0.01,
+            floor_tilt_range=0.0,
         ):
         self.camera = camera
         self.render_mode = render_mode
@@ -53,22 +67,27 @@ class GnociGymEnv(gym.Env):
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
+        self.floor_tilt_range = floor_tilt_range
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
-            shape=(_N_JOINTS + _N_JOINTS + _N_TOUCH + 1,),  # joint pos, joint vel, contact forces, root height
+            shape=(_N_JOINTS + _N_JOINTS + _N_TOUCH + 6,),  # joint pos, joint vel, contact forces, root height
             dtype=np.float32
         )
         self.action_space = gym.spaces.Box(
             -1, 1, shape=(_N_JOINTS,), dtype=np.float32
         )
         self.initialize_model()
+        self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
+        self._randomize_joint_positions(randomness=self.initial_randomness)
+        mujoco.mj_forward(self.model, self.data)
 
     def initialize_model(self):
         xml_content = _load_and_perturb_basic_xml(
             'scene',
             inertial_mass_range=self.inertial_mass_range,
             inertial_mass_noise=self.inertial_mass_noise,
+            floor_tilt_range=self.floor_tilt_range,
         )
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.model.opt.timestep = self.env_rate
@@ -87,8 +106,27 @@ class GnociGymEnv(gym.Env):
             for n in _TOUCH_SENSOR_NAMES
         ]
         self.body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY, "hor_rot_body_joint"
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "head_base"
         )
+        self.floor_geom_id = self.model.geom("floor").id
+        self.floor_z = self.model.geom_pos[self.floor_geom_id][2]
+        self.joint_qpos_addrs = [
+            self.model.jnt_qposadr[self.model.joint(j).id]
+            for j in _JOINT_NAMES
+        ]
+        self.imu_sensor_addrs = [
+            self.model.sensor_adr[self.model.sensor(n).id]
+            for n in ["imu-gyro", "imu-acc"]
+        ]
+
+    def _set_joint_positions(self, joint_positions):
+        for jnt_name, pos in joint_positions.items():
+            if pos is None:
+                continue
+            qpos_addr = self.model.jnt_qposadr[self.model.joint(jnt_name).id]
+            self.data.qpos[qpos_addr] = pos
+        for i, qpos_addr in enumerate(self.joint_qpos_addrs):
+            self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
@@ -96,12 +134,16 @@ class GnociGymEnv(gym.Env):
                 continue
             range_min, range_max = self.model.jnt_range[joint_id]
             adr = self.model.jnt_qposadr[joint_id]
-            self.data.qpos[adr] = np.clip(np.random.normal(0, randomness), range_min, range_max)
+            self.data.qpos[adr] += np.clip(np.random.normal(0, randomness), range_min, range_max)
+        for i, qpos_addr in enumerate(self.joint_qpos_addrs):
+            self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
     def reset(self, seed=None, **kwargs):
         self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
+        self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
+        mujoco.mj_forward(self.model, self.data)
         self.done = False
         return self._get_obs(), {}
 
@@ -119,7 +161,7 @@ class GnociGymEnv(gym.Env):
             *self._get_joint_positions(),
             *self._get_joint_velocities(),
             *self._get_contact_forces(),
-            self._get_root_height(),
+            *self._get_imu_data(),
         ])
         return obs.astype(np.float32)
 
@@ -135,12 +177,16 @@ class GnociGymEnv(gym.Env):
         return np.dot(z_axis, [0, 0, 1])
 
     def _get_root_height(self):
-        _, _, height = self.data.xpos[self.body_id]
-        return height
+        _, _, z = self.data.xpos[self.body_id]
+        return z - self.floor_z
+
+    def _get_imu_data(self):
+        gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
+        acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
+        return np.concatenate([gyro, acc])
 
     def _get_velocity(self):
-        # Linear velocity of root body in world frame (freejoint qvel[0:3])
-        return self.data.qvel[0:3]
+        return self.data.cvel[self.body_id][3:6]
 
     def _get_reward(self):
         upright = self._get_root_upright()
@@ -152,18 +198,19 @@ class GnociGymEnv(gym.Env):
         )
         upright = (1 + upright) / 2
         stand_reward = (3 * standing + upright) / 4
+        # velocity = self._get_velocity()
+        # side_v = abs(velocity[1])
+        # lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
 
-        velocity = self._get_velocity()
-        side_v = abs(velocity[1])
-        lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
+        # velocity_reward = tolerance(
+        #     -velocity[0],
+        #     bounds=(1, 2),
+        #     margin=1
+        # )
 
-        velocity_reward = tolerance(
-            -velocity[0],
-            bounds=(1, 2),
-            margin=1
-        )
-        total_reward = stand_reward * (5 * velocity_reward + 1) / 6
-        return total_reward * lateral_penalty
+        # total_reward = stand_reward * (5 * velocity_reward + 1) / 6
+        # return total_reward * lateral_penalty
+        return stand_reward
 
     def step(self, action):
         action = action.clip(-1, 1)
