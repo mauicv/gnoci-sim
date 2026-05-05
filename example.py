@@ -11,7 +11,6 @@ gym.register(
     id="gnoci_gym/Gnoci-v0",
     entry_point=GnociGymEnv,
     kwargs={
-        'env_rate': 0.01,
         'initial_randomness': 0.0,
         'inertial_mass_range': (0.00, 0.00),
         'inertial_mass_noise': 0.00,
@@ -21,7 +20,6 @@ gym.register(
 
 env = gym.make(
     "gnoci_gym/Gnoci-v0",
-    env_rate=0.01,
     initial_randomness=0.0,
     floor_tilt_range=0.0,
 )

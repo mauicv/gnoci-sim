@@ -43,18 +43,21 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
+PHYSICS_DT  = 0.002   # MuJoCo integration timestep (500 Hz)
+CONTROL_HZ  = 60      # policy / action frequency
+N_SUBSTEPS  = int(round(1.0 / (CONTROL_HZ * PHYSICS_DT)))  # 25 physics steps per action
+
 
 class GnociGymEnv(gym.Env):
     metadata = {
         'render_modes': ['rgb_array'],
-        'render_fps': 30,
+        'render_fps': CONTROL_HZ,
     }
 
     def __init__(
             self,
             camera='track',
             render_mode='rgb_array',
-            env_rate=0.005,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
             inertial_mass_noise=0.01,
@@ -63,7 +66,6 @@ class GnociGymEnv(gym.Env):
         self.camera = camera
         self.render_mode = render_mode
         self.done = False
-        self.env_rate = env_rate
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
@@ -90,7 +92,7 @@ class GnociGymEnv(gym.Env):
             floor_tilt_range=self.floor_tilt_range,
         )
         self.model = mujoco.MjModel.from_xml_string(xml_content)
-        self.model.opt.timestep = self.env_rate
+        self.model.opt.timestep = PHYSICS_DT
         self.data = mujoco.MjData(self.model)
 
         self.joint_pos_sensor_addrs = [
@@ -216,7 +218,8 @@ class GnociGymEnv(gym.Env):
         action = action.clip(-1, 1)
         for i in range(self.model.nu):
             self.data.ctrl[i] = action[i]
-        mujoco.mj_step(self.model, self.data)
+        for _ in range(N_SUBSTEPS):
+            mujoco.mj_step(self.model, self.data)
         state = self._get_obs()
         reward = self._get_reward()
         if self.overturned():
