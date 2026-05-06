@@ -4,6 +4,17 @@ import numpy as np
 import mujoco
 
 
+def _expand_includes(root, desc_dir):
+    """Replace <include> elements with the children of the referenced file."""
+    for include in list(root.findall('include')):
+        filepath = os.path.join(desc_dir, os.path.basename(include.get('file', '')))
+        included_root = ET.parse(filepath).getroot()
+        idx = list(root).index(include)
+        root.remove(include)
+        for i, child in enumerate(included_root):
+            root.insert(idx + i, child)
+
+
 def _load_and_perturb_basic_xml(
         filename,
         inertial_mass_range=(0.04, 0.06),
@@ -11,14 +22,15 @@ def _load_and_perturb_basic_xml(
         floor_tilt_range=0.0,
     ):
     package_dir = os.path.dirname(os.path.abspath(__file__))
-    desc_dir   = os.path.join(package_dir, 'desc')
-    xml_path   = os.path.join(desc_dir, f'{filename}.xml')
-    xml_tree = ET.parse(xml_path)
-    xml_root = xml_tree.getroot()
+    desc_dir    = os.path.join(package_dir, 'desc')
+    assets_dir  = os.path.join(desc_dir, 'assets')
+    xml_path    = os.path.join(desc_dir, f'{filename}.xml')
 
-    for include in xml_root.iter('include'):
-        rel = include.get('file', '')
-        include.set('file', os.path.join(desc_dir, os.path.basename(rel)))
+    xml_root = ET.parse(xml_path).getroot()
+    _expand_includes(xml_root, desc_dir)
+
+    for compiler in xml_root.iter('compiler'):
+        compiler.set('meshdir', assets_dir)
 
     for child in xml_root.findall('.//geom'):
         if child.attrib.get('mass', '0') == '0':
