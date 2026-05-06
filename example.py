@@ -27,11 +27,11 @@ env = gym.make(
 )
 
 state, *_ = env.reset(seed=0)
-
+                                                                                                                                                                                    
 times = []
 actions = []
 control = []
-responses = []
+contacts = []
 dones = []
 frames = []
 rewards = []
@@ -43,6 +43,7 @@ root_heights = []
 root_uprights = []
 
 for i in tqdm(range(100)):
+
     action = np.random.uniform(-1, 1, env.action_space.shape[0])
     # action = np.ones(env.action_space.shape[0])
     # action = env.unwrapped.data.ctrl.copy()
@@ -54,16 +55,18 @@ for i in tqdm(range(100)):
     root_uprights.append(root_upright)
     
     times.append(env.unwrapped.data.time)
-    # dones.append(int(done))
+    dones.append(int(done))
     # actions.append(action)
     # control.append(env.unwrapped.data.ctrl.copy())
-    # responses.append(state)
+    contacts.append(env.unwrapped._get_contact_forces())
     rewards.append(reward)
     frames.append(env.render())
 
-plt.plot(times, root_heights)
-plt.plot(times, root_uprights)
-plt.plot(times, rewards)
+# plt.plot(times, root_heights)
+# plt.plot(times, root_uprights)
+# plt.plot(times, rewards)
+# plt.plot(times, dones)
+plt.plot(times, contacts)
 plt.show()
 
 imageio.mimsave(f'assets/animation.gif', frames, loop=0, fps=30)

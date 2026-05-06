@@ -35,9 +35,10 @@ SITE_SIZE = 0.01      # metres
 
 ACTUATOR_CLASS = "miuzei_25kg"
 
-# Cutoff radius for c_sense touch sensors (metres).  Sites are ~0.052 m apart;
-# half that ensures a contact at one site can't reach the other.
-C_SENSE_CUTOFF = 0.025
+# Touch sensor site size (metres).  Sites sit ~0.035 m above the floor contact
+# surface; 0.04 m radius reaches the floor (0.035 m away) but not the opposite
+# site (~0.063 m away), giving clean front/back separation.
+C_SENSE_SITE_SIZE = 0.04
 
 # Meshes whose collision geoms should be stripped — sensors, servos, and
 # electronics that are rigidly mounted and only cause spurious contact forces.
@@ -158,11 +159,11 @@ def process(src, dst):
     for site in root.iter("site"):
         name = site.get("name", "")
         if "c_sense" in name:
+            site.set("size", str(C_SENSE_SITE_SIZE))
             c_sense_sites.append(name)
             t = ET.SubElement(sensor_el, "touch")
             t.set("name", f"{name}-touch")
             t.set("site", name)
-            t.set("cutoff", str(C_SENSE_CUTOFF))
 
     for tag, sname in [("gyro", "imu-gyro"), ("accelerometer", "imu-acc")]:
         s = ET.SubElement(sensor_el, tag)

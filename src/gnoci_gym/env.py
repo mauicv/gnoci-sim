@@ -168,7 +168,7 @@ class GnociGymEnv(gym.Env):
         return self.data.qvel[self.joint_dof_addrs]
 
     def _get_contact_forces(self):
-        return self.data.sensordata[self.touch_sensor_addrs]
+        return (self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32)
 
     def _get_obs(self):
         gyro, acc = self._get_imu_data()
