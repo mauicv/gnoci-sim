@@ -11,9 +11,14 @@ def _load_and_perturb_basic_xml(
         floor_tilt_range=0.0,
     ):
     package_dir = os.path.dirname(os.path.abspath(__file__))
-    xml_path = os.path.join(package_dir, 'desc', f'{filename}.xml')
+    desc_dir   = os.path.join(package_dir, 'desc')
+    xml_path   = os.path.join(desc_dir, f'{filename}.xml')
     xml_tree = ET.parse(xml_path)
     xml_root = xml_tree.getroot()
+
+    for include in xml_root.iter('include'):
+        rel = include.get('file', '')
+        include.set('file', os.path.join(desc_dir, os.path.basename(rel)))
 
     for child in xml_root.findall('.//geom'):
         if child.attrib.get('mass', '0') == '0':
