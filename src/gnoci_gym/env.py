@@ -44,8 +44,10 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
-PHYSICS_DT    = 0.002  # MuJoCo integration timestep (500 Hz)
-MAX_JOINT_VEL = 3.0   # max joint angular velocity (rad/s) — scales action deltas
+PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
+MAX_JOINT_VEL = 3.0    # max joint angular velocity (rad/s) — scales action deltas
+IMU_GYRO_SCALE = 10.0  # rad/s — clips to [-1, 1] at this angular velocity
+IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
 
 
 class GnociGymEnv(gym.Env):
@@ -87,6 +89,7 @@ class GnociGymEnv(gym.Env):
         self.initialize_model()
         self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
+        self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
 
     def initialize_model(self):
@@ -141,6 +144,10 @@ class GnociGymEnv(gym.Env):
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
+    def _sync_action_filters(self):
+        for i, f in enumerate(self.action_filters):
+            f.value = float(self.data.ctrl[i])
+
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
             if self.model.jnt_type[joint_id] == mujoco.mjtJoint.mjJNT_FREE:
@@ -156,6 +163,7 @@ class GnociGymEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
+        self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
         self.comp_filter.reset()
         self.done = False
@@ -176,8 +184,8 @@ class GnociGymEnv(gym.Env):
             *self._get_joint_positions(),
             *self._get_joint_velocities(),
             *self._get_contact_forces(),
-            *gyro,
-            *acc,
+            *(gyro / IMU_GYRO_SCALE),
+            *(acc / IMU_ACC_SCALE),
             *self._get_pitch_and_roll(gyro, acc),
         ])
         return obs.astype(np.float32)
@@ -186,7 +194,7 @@ class GnociGymEnv(gym.Env):
         return {}
 
     def overturned(self):
-        return self._get_root_upright() < 0
+        return self._get_root_upright() < 0.3
 
     def _get_root_upright(self):
         xmat = self.data.xmat[self.body_id]
