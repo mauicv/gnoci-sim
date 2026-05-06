@@ -19,7 +19,6 @@ dependencies = [
     "gymnasium",
     "mujoco",
     "filterpy",
-    "simple-pid"
 ]
 dynamic = ["version"]
 
