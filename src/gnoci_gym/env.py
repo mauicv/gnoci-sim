@@ -44,23 +44,19 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
-PHYSICS_DT     = 0.002   # MuJoCo integration timestep (500 Hz)
-CONTROL_HZ     = 60      # policy / action frequency
-N_SUBSTEPS     = int(round(1.0 / (CONTROL_HZ * PHYSICS_DT)))  # physics steps per action
-MAX_JOINT_VEL  = 3.0    # max joint angular velocity (rad/s) — scales action deltas
-ACTION_SCALE   = MAX_JOINT_VEL / CONTROL_HZ  # max delta per action step (rad)
+PHYSICS_DT    = 0.002  # MuJoCo integration timestep (500 Hz)
+MAX_JOINT_VEL = 3.0   # max joint angular velocity (rad/s) — scales action deltas
 
 
 class GnociGymEnv(gym.Env):
-    metadata = {
-        'render_modes': ['rgb_array'],
-        'render_fps': CONTROL_HZ,
-    }
+    metadata = {'render_modes': ['rgb_array']}
 
     def __init__(
             self,
             camera='track',
             render_mode='rgb_array',
+            control_hz=60,
+            max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
             inertial_mass_noise=0.01,
@@ -70,11 +66,15 @@ class GnociGymEnv(gym.Env):
         self.camera = camera
         self.render_mode = render_mode
         self.done = False
+        self.control_hz = control_hz
+        self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
+        self.action_scale = max_joint_vel / control_hz
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
         self.floor_tilt_range = floor_tilt_range
         self.action_filter_alpha = action_filter_alpha
+        self.metadata['render_fps'] = control_hz
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
@@ -203,7 +203,7 @@ class GnociGymEnv(gym.Env):
         return gyro, acc
 
     def _get_pitch_and_roll(self, gyro, acc):
-        self.comp_filter.update(acc, gyro, dt=1.0 / CONTROL_HZ)
+        self.comp_filter.update(acc, gyro, dt=1.0 / self.control_hz)
         return np.array([self.comp_filter.pitch, self.comp_filter.roll], dtype=np.float32)
 
     def _get_velocity(self):
@@ -236,10 +236,10 @@ class GnociGymEnv(gym.Env):
     def step(self, action):
         action = action.clip(-1, 1)
         for i in range(self.model.nu):
-            delta = self.action_filters[i].update(action[i]) * ACTION_SCALE
+            delta = self.action_filters[i].update(action[i]) * self.action_scale
             lo, hi = self.joint_ranges[i]
             self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
-        for _ in range(N_SUBSTEPS):
+        for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         state = self._get_obs()
         reward = self._get_reward()
