@@ -4,3 +4,5 @@ MUJOCO_LOG.TXT
 test*.png
 __pycache__/
 gnoci_gym.egg-info/
+.env
+ose.bu
