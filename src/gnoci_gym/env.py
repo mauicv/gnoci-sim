@@ -4,6 +4,7 @@ import numpy as np
 import os
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
+from .filters import ComplementaryFilter, EMAFilter
 
 _STANDING_HEIGHT = 0.235  # TODO: calibrate once robot is simulating
 
@@ -43,9 +44,11 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
-PHYSICS_DT  = 0.002   # MuJoCo integration timestep (500 Hz)
-CONTROL_HZ  = 60      # policy / action frequency
-N_SUBSTEPS  = int(round(1.0 / (CONTROL_HZ * PHYSICS_DT)))  # 25 physics steps per action
+PHYSICS_DT     = 0.002   # MuJoCo integration timestep (500 Hz)
+CONTROL_HZ     = 60      # policy / action frequency
+N_SUBSTEPS     = int(round(1.0 / (CONTROL_HZ * PHYSICS_DT)))  # physics steps per action
+MAX_JOINT_VEL  = 3.0    # max joint angular velocity (rad/s) — scales action deltas
+ACTION_SCALE   = MAX_JOINT_VEL / CONTROL_HZ  # max delta per action step (rad)
 
 
 class GnociGymEnv(gym.Env):
@@ -62,6 +65,7 @@ class GnociGymEnv(gym.Env):
             inertial_mass_range=(0.04, 0.06),
             inertial_mass_noise=0.01,
             floor_tilt_range=0.0,
+            action_filter_alpha=0.4,
         ):
         self.camera = camera
         self.render_mode = render_mode
@@ -70,10 +74,11 @@ class GnociGymEnv(gym.Env):
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
         self.floor_tilt_range = floor_tilt_range
+        self.action_filter_alpha = action_filter_alpha
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
-            shape=(_N_JOINTS + _N_JOINTS + _N_TOUCH + 6,),  # joint pos, joint vel, contact forces, root height
+            shape=(_N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2,),  # joint pos, joint vel, touch, imu, pitch+roll
             dtype=np.float32
         )
         self.action_space = gym.spaces.Box(
@@ -116,10 +121,16 @@ class GnociGymEnv(gym.Env):
             self.model.jnt_qposadr[self.model.joint(j).id]
             for j in _JOINT_NAMES
         ]
+        self.joint_ranges = [
+            self.model.jnt_range[self.model.joint(j).id]
+            for j in _JOINT_NAMES
+        ]
         self.imu_sensor_addrs = [
             self.model.sensor_adr[self.model.sensor(n).id]
             for n in ["imu-gyro", "imu-acc"]
         ]
+        self.comp_filter = ComplementaryFilter()
+        self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
 
     def _set_joint_positions(self, joint_positions):
         for jnt_name, pos in joint_positions.items():
@@ -146,6 +157,7 @@ class GnociGymEnv(gym.Env):
         self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
         mujoco.mj_forward(self.model, self.data)
+        self.comp_filter.reset()
         self.done = False
         return self._get_obs(), {}
 
@@ -159,11 +171,14 @@ class GnociGymEnv(gym.Env):
         return self.data.sensordata[self.touch_sensor_addrs]
 
     def _get_obs(self):
+        gyro, acc = self._get_imu_data()
         obs = np.array([
             *self._get_joint_positions(),
             *self._get_joint_velocities(),
             *self._get_contact_forces(),
-            *self._get_imu_data(),
+            *gyro,
+            *acc,
+            *self._get_pitch_and_roll(gyro, acc),
         ])
         return obs.astype(np.float32)
 
@@ -185,7 +200,11 @@ class GnociGymEnv(gym.Env):
     def _get_imu_data(self):
         gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
         acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
-        return np.concatenate([gyro, acc])
+        return gyro, acc
+
+    def _get_pitch_and_roll(self, gyro, acc):
+        self.comp_filter.update(acc, gyro, dt=1.0 / CONTROL_HZ)
+        return np.array([self.comp_filter.pitch, self.comp_filter.roll], dtype=np.float32)
 
     def _get_velocity(self):
         return self.data.cvel[self.body_id][3:6]
@@ -217,7 +236,9 @@ class GnociGymEnv(gym.Env):
     def step(self, action):
         action = action.clip(-1, 1)
         for i in range(self.model.nu):
-            self.data.ctrl[i] = action[i]
+            delta = self.action_filters[i].update(action[i]) * ACTION_SCALE
+            lo, hi = self.joint_ranges[i]
+            self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
         for _ in range(N_SUBSTEPS):
             mujoco.mj_step(self.model, self.data)
         state = self._get_obs()

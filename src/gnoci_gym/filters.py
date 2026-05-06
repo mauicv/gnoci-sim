@@ -21,25 +21,25 @@ class ComplementaryFilter:
         self.a_pitch = 0
         self.t_last = None
 
-    def update(self, acc_data, gyro_data):
-        if self.t_last is None:
-            self.t_last = time.process_time()
-            return
-
+    def update(self, acc_data, gyro_data, dt=None):
         x_accel, y_accel, z_accel = acc_data
         x_gyro, y_gyro, _ = gyro_data
 
-        self.a_roll = math.atan2(-x_accel, z_accel)*180/math.pi
-        self.a_pitch = math.atan2(y_accel, z_accel)*180/math.pi
+        self.a_roll  = math.atan2(-x_accel, z_accel) * 180 / math.pi
+        self.a_pitch = math.atan2( y_accel, z_accel) * 180 / math.pi
 
-        t_start = time.process_time()        
-        dt = (t_start - self.t_last)
-        self.rollComp = self.a_roll * (1 - self.alpha) \
-            + self.alpha * (self.rollComp + y_gyro * dt)
-        self.pitchComp = self.a_pitch * (1 - self.alpha) \
-             + self.alpha * (self.pitchComp + x_gyro * dt)
-        
-        self.t_last = t_start
+        if dt is None:
+            t_now = time.process_time()
+            dt = (t_now - self.t_last) if self.t_last is not None else 0.0
+            self.t_last = t_now
+
+        if dt == 0.0:
+            self.rollComp  = self.a_roll
+            self.pitchComp = self.a_pitch
+            return
+
+        self.rollComp  = self.a_roll  * (1 - self.alpha) + self.alpha * (self.rollComp  + y_gyro * dt)
+        self.pitchComp = self.a_pitch * (1 - self.alpha) + self.alpha * (self.pitchComp + x_gyro * dt)
 
     @property
     def roll(self):
@@ -62,33 +62,14 @@ class ComplementaryFilter:
         return self.g_x, self.g_y
 
 
-def make_mpu6050_filter():
-    filter = KalmanFilter(dim_x=6, dim_z=6)
-    filter.x = np.array([0, 0, 0, 0, 0, 0])
-    filter.F = np.array([
-        [1, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 1]
-    ])
-    filter.H = np.eye(6)
-    filter.P = np.eye(6) * 1000
-    filter.R = np.eye(6) * 5
-    filter.Q = np.eye(6) * 0.5
-    return filter
-
-
-class KalmanMPU6050Filter:
-    def __init__(self, ):
-        self.filter = make_mpu6050_filter()
+class EMAFilter:
+    def __init__(self, alpha=0.4):
+        self.reset()
+        self.alpha = alpha
 
     def reset(self):
-        self.filter = make_mpu6050_filter()
+        self.value = 0
 
-    def __call__(self, data):
-        ax, ay, az, gx, gy, gz = data
-        self.filter.predict()
-        self.filter.update(np.array([ax, ay, az, gx, gy, gz]))
-        return self.filter.x
+    def update(self, value):
+        self.value = self.alpha * value + (1 - self.alpha) * self.value
+        return self.value
