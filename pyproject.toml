@@ -23,4 +23,4 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools.package-data]
-puppypi_gym = ["gnoci_gym/desc/*.xml", "gnoci_gym/desc/meshes/*.stl"]
+gnoci_gym = ["desc/*.xml", "desc/assets/*"]
