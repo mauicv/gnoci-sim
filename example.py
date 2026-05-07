@@ -7,23 +7,26 @@ import matplotlib.pyplot as plt
 import mujoco
 import sys
 
-gym.register(
-    id="gnoci_gym/Gnoci-v0",
-    entry_point=GnociGymEnv,
-    kwargs={
-        'initial_randomness': 0.0,
-        'inertial_mass_range': (0.00, 0.00),
-        'inertial_mass_noise': 0.00,
-        'floor_tilt_range': 0.075,
-    }
-)
+# kwargs = {
+#     "initial_randomness": 0.0,
+#     "floor_tilt_range": 0.0,
+#     "inertial_mass_range": (0.0, 0.0),
+#     "inertial_mass_noise": 0.0,
+#     "action_filter_alpha": 0.0,
+#     "control_hz": 40,
+#     "max_joint_vel": 6.0,
+# }
 
-env = gym.make(
-    "gnoci_gym/Gnoci-v0",
-    initial_randomness=0.0,
-    floor_tilt_range=0.0,
+# env = GnociGymEnv(**kwargs)
+
+env = GnociGymEnv(
+    # initial_randomness=0.0,
+    # inertial_mass_range=(0.00, 0.00),
+    # inertial_mass_noise=0.00,
+    # floor_tilt_range=0.0,
+    action_filter_alpha=1,
     control_hz=40,
-    max_joint_vel=6.0,
+    max_joint_vel=6,
 )
 
 state, *_ = env.reset(seed=0)

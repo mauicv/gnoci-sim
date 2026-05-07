@@ -53,6 +53,9 @@ def main():
         inertial_mass_range=(0.00, 0.00),
         inertial_mass_noise=0.00,
         floor_tilt_range=0.075,
+        action_filter_alpha=0.0,
+        control_hz=40,
+        max_joint_vel=6.0,
     )
     env.reset(seed=0)
     apply_overrides(env.model, args)
