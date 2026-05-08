@@ -64,9 +64,11 @@ class GnociGymEnv(gym.Env):
             inertial_mass_noise=0.01,
             floor_tilt_range=0.0,
             action_filter_alpha=0.4,
+            task='stand',
         ):
         self.camera = camera
         self.render_mode = render_mode
+        self.task = task
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
@@ -227,18 +229,18 @@ class GnociGymEnv(gym.Env):
         )
         upright = (1 + upright) / 2
         stand_reward = (3 * standing + upright) / 4
-        # velocity = self._get_velocity()
-        # side_v = abs(velocity[1])
-        # lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
 
-        # velocity_reward = tolerance(
-        #     -velocity[0],
-        #     bounds=(1, 2),
-        #     margin=1
-        # )
+        if self.task == 'walk':
+            velocity = self._get_velocity()
+            side_v = abs(velocity[1])
+            lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
+            velocity_reward = tolerance(
+                -velocity[0],
+                bounds=(1, 2),
+                margin=1
+            )
+            return stand_reward * (5 * velocity_reward + 1) / 6 * lateral_penalty
 
-        # total_reward = stand_reward * (5 * velocity_reward + 1) / 6
-        # return total_reward * lateral_penalty
         return stand_reward
 
     def step(self, action):
