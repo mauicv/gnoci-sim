@@ -232,10 +232,10 @@ class GnociGymEnv(gym.Env):
 
         if self.task == 'walk':
             velocity = self._get_velocity()
-            side_v = abs(velocity[1])
+            side_v = abs(velocity[0])
             lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
             velocity_reward = tolerance(
-                -velocity[0],
+                -velocity[1],
                 bounds=(1, 2),
                 margin=1
             )
