@@ -239,7 +239,7 @@ class GnociGymEnv(gym.Env):
                 bounds=(0.1, 0.3),
                 margin=0.1
             )
-            return stand_reward + velocity_reward * lateral_penalty
+            return stand_reward * (1 + velocity_reward * lateral_penalty)
 
         return stand_reward
 
