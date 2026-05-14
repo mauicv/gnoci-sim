@@ -236,8 +236,8 @@ class GnociGymEnv(gym.Env):
             lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
             velocity_reward = tolerance(
                 -velocity[1],
-                bounds=(0.1, 0.3),
-                margin=0.1
+                bounds=(0.3, 0.6),
+                margin=0.3
             )
             return stand_reward * (1 + velocity_reward * lateral_penalty)
 
