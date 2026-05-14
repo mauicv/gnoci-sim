@@ -2,6 +2,7 @@ import mujoco
 import gymnasium as gym
 import numpy as np
 import os
+from collections import deque
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
@@ -45,6 +46,7 @@ _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
+_CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
 MAX_JOINT_VEL = 3.0    # max joint angular velocity (rad/s) — scales action deltas
 IMU_GYRO_SCALE = 10.0  # rad/s — clips to [-1, 1] at this angular velocity
 IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
@@ -136,6 +138,10 @@ class GnociGymEnv(gym.Env):
         ]
         self.comp_filter = ComplementaryFilter()
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
+        self._contact_buffer = deque([False] * grace_steps, maxlen=grace_steps)
+        self._foot_airtime = [0.0, 0.0]
+        self._foot_was_contact = [False, False]
 
     def _set_joint_positions(self, joint_positions):
         for jnt_name, pos in joint_positions.items():
@@ -219,27 +225,66 @@ class GnociGymEnv(gym.Env):
     def _get_velocity(self):
         return self.data.cvel[self.body_id][3:6]
 
-    def _get_reward(self):
+    def _get_foot_airtime_reward(self):
+        dt = 1.0 / self.control_hz
+        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        current = [
+            contacts[0] > 0 or contacts[1] > 0,  # left foot
+            contacts[2] > 0 or contacts[3] > 0,  # right foot
+        ]
+        reward = 0.0
+        for i, (in_contact, was_contact) in enumerate(zip(current, self._foot_was_contact)):
+            if not in_contact:
+                self._foot_airtime[i] += dt
+            elif not was_contact:  # touchdown
+                reward += self._foot_airtime[i] - 0.4
+                self._foot_airtime[i] = 0.0
+        self._foot_was_contact = current
+        return reward
+
+    def _get_stand_reward(self):
         upright = self._get_root_upright()
-        height = self._get_root_height()
+        height  = self._get_root_height()
         standing = tolerance(
             height,
             bounds=(_STANDING_HEIGHT, float('inf')),
-            margin=_STANDING_HEIGHT / 2
+            margin=_STANDING_HEIGHT / 2,
         )
         upright = (1 + upright) / 2
-        stand_reward = (3 * standing + upright) / 4
+        return (3 * standing + upright) / 4
+
+    def _get_velocity_reward(self):
+        velocity = self._get_velocity()
+        side_v = abs(velocity[0])
+        lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
+        forward_reward = tolerance(-velocity[1], bounds=(0.1, 0.3), margin=0.1)
+        return forward_reward * lateral_penalty
+
+    def _get_orientation_reward(self):
+        pitch = float(self.comp_filter.pitch)
+        roll  = float(self.comp_filter.roll)
+        return (
+            tolerance(pitch, bounds=(0, 0), margin=0.2) *
+            tolerance(roll,  bounds=(0, 0), margin=0.2)
+        )
+
+    def _get_foot_contact_reward(self):
+        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        left  = contacts[0] > 0 or contacts[1] > 0
+        right = contacts[2] > 0 or contacts[3] > 0
+        single = left ^ right
+        self._contact_buffer.append(single)
+        return 1.0 if any(self._contact_buffer) else 0.0
+
+    def _get_reward(self):
+        stand_reward = self._get_stand_reward()
 
         if self.task == 'walk':
-            velocity = self._get_velocity()
-            side_v = abs(velocity[0])
-            lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
-            velocity_reward = tolerance(
-                -velocity[1],
-                bounds=(0.1, 0.3),
-                margin=0.1
-            )
-            return stand_reward * (1 + velocity_reward * lateral_penalty)
+            velocity_reward     = self._get_velocity_reward()
+            foot_contact_reward = self._get_foot_contact_reward()
+            foot_airtime_reward = self._get_foot_airtime_reward()
+            orientation_reward  = self._get_orientation_reward()
+            return stand_reward * (1 + velocity_reward) + foot_contact_reward + foot_airtime_reward + orientation_reward
 
         return stand_reward
 
