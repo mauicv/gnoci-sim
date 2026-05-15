@@ -55,6 +55,16 @@ IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
 class GnociGymEnv(gym.Env):
     metadata = {'render_modes': ['rgb_array']}
 
+    DEFAULT_REWARD_COEFS = {
+        'stand':        1.0,
+        'velocity':     2.5,
+        'foot_contact': 0.5,
+        'foot_airtime': 0.5,
+        'orientation':  0.3,
+        'heading':      0.3,
+        'yoke_joint':   0.2,
+    }
+
     def __init__(
             self,
             camera='track',
@@ -67,10 +77,12 @@ class GnociGymEnv(gym.Env):
             floor_tilt_range=0.0,
             action_filter_alpha=0.4,
             task='stand',
+            reward_coefs=None,
         ):
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
+        self.reward_coefs = {**self.DEFAULT_REWARD_COEFS, **(reward_coefs or {})}
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
@@ -257,7 +269,7 @@ class GnociGymEnv(gym.Env):
         velocity = self._get_velocity()
         side_v = abs(velocity[0])
         lateral_penalty = max(1.0 - 2.0 * side_v, 0.0)
-        forward_reward = tolerance(-velocity[1], bounds=(0.4, 0.6), margin=0.2)
+        forward_reward = tolerance(-velocity[1], bounds=(0.4, 0.6), margin=0.4)
         return forward_reward * lateral_penalty
 
     def _get_orientation_reward(self):
@@ -297,6 +309,7 @@ class GnociGymEnv(gym.Env):
         return 1.0 if any(self._contact_buffer) else 0.0
 
     def _get_reward(self):
+        c = self.reward_coefs
         stand_reward = self._get_stand_reward()
 
         if self.task == 'walk':
@@ -306,9 +319,16 @@ class GnociGymEnv(gym.Env):
             orientation_reward  = self._get_orientation_reward()
             heading_reward      = self._get_heading_reward()
             yoke_joint_reward   = self._get_yoke_joint_reward()
-            return stand_reward * (1 + velocity_reward) + foot_contact_reward + foot_airtime_reward + orientation_reward + heading_reward + yoke_joint_reward
+            return (
+                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
+                + c['foot_contact'] * foot_contact_reward
+                + c['foot_airtime'] * foot_airtime_reward
+                + c['orientation']  * orientation_reward
+                + c['heading']      * heading_reward
+                + c['yoke_joint']   * yoke_joint_reward
+            )
 
-        return stand_reward
+        return c['stand'] * stand_reward
 
     def step(self, action):
         action = action.clip(-1, 1)
