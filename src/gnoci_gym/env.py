@@ -237,7 +237,7 @@ class GnociGymEnv(gym.Env):
             if not in_contact:
                 self._foot_airtime[i] += dt
             elif not was_contact:  # touchdown
-                reward += self._foot_airtime[i] - 0.4
+                reward += self._foot_airtime[i] - 0.12
                 self._foot_airtime[i] = 0.0
         self._foot_was_contact = current
         return reward
@@ -256,8 +256,8 @@ class GnociGymEnv(gym.Env):
     def _get_velocity_reward(self):
         velocity = self._get_velocity()
         side_v = abs(velocity[0])
-        lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
-        forward_reward = tolerance(-velocity[1], bounds=(0.1, 0.3), margin=0.1)
+        lateral_penalty = max(1.0 - 2.0 * side_v, 0.0)
+        forward_reward = tolerance(-velocity[1], bounds=(0.4, 0.6), margin=0.2)
         return forward_reward * lateral_penalty
 
     def _get_orientation_reward(self):
@@ -267,6 +267,26 @@ class GnociGymEnv(gym.Env):
             tolerance(pitch, bounds=(0, 0), margin=0.2) *
             tolerance(roll,  bounds=(0, 0), margin=0.2)
         )
+
+    def _get_yoke_joint_reward(self):
+        # Encourage head__left_yoke, left_yoke__hip, head__right_yoke, right_yoke__hip
+        # to stay near their default position of 0.0
+        positions = self._get_joint_positions()
+        yoke_indices = [0, 1, 5, 6]
+        return float(np.mean([
+            tolerance(float(positions[i]), bounds=(0.0, 0.0), margin=0.2)
+            for i in yoke_indices
+        ]))
+
+    def _get_heading_reward(self):
+        xmat = self.data.xmat[self.body_id]
+        # Body forward direction in world XY plane (-Y body axis, rewarded motion is -Y world)
+        body_forward = np.array([-xmat[3], -xmat[4]])
+        body_forward_norm = np.linalg.norm(body_forward)
+        if body_forward_norm < 1e-6:
+            return 0.0
+        body_forward = body_forward / body_forward_norm
+        return float((np.dot(body_forward, [0.0, -1.0]) + 1.0) / 2.0)
 
     def _get_foot_contact_reward(self):
         contacts = self.data.sensordata[self.touch_sensor_addrs]
@@ -284,7 +304,9 @@ class GnociGymEnv(gym.Env):
             foot_contact_reward = self._get_foot_contact_reward()
             foot_airtime_reward = self._get_foot_airtime_reward()
             orientation_reward  = self._get_orientation_reward()
-            return stand_reward * (1 + velocity_reward) + foot_contact_reward + foot_airtime_reward + orientation_reward
+            heading_reward      = self._get_heading_reward()
+            yoke_joint_reward   = self._get_yoke_joint_reward()
+            return stand_reward * (1 + velocity_reward) + foot_contact_reward + foot_airtime_reward + orientation_reward + heading_reward + yoke_joint_reward
 
         return stand_reward
 
