@@ -2,6 +2,7 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
+import torch
 
 from .env import (
     PHYSICS_DT,
@@ -120,6 +121,21 @@ class ReferenceEnv:
             dataset = stacked
 
         return dataset
+
+    def sample_pairs(
+        self,
+        batch_size: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
+
+        Returns:
+            Tuple of (s_i, s_next), each of shape (batch_size, *obs_shape).
+        """
+        n_ref = len(self._dataset)
+        inds = torch.randint(0, n_ref, (batch_size,))
+        s_i = torch.from_numpy(self._dataset[inds])
+        s_next = torch.from_numpy(self._dataset[(inds + 1) % n_ref])
+        return s_i, s_next
 
     def get_reference(self) -> np.ndarray:
         return self._dataset

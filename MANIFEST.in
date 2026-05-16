@@ -1,2 +1,3 @@
 recursive-include src/gnoci_gym/desc *.xml
 recursive-include src/gnoci_gym/desc/meshes *.stl
+recursive-include src/gnoci_gym/reference/xml *.xml
