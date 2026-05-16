@@ -2,6 +2,7 @@ import mujoco
 import gymnasium as gym
 import numpy as np
 import os
+from collections import deque
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
@@ -45,6 +46,7 @@ _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
+_CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
 MAX_JOINT_VEL = 3.0    # max joint angular velocity (rad/s) — scales action deltas
 IMU_GYRO_SCALE = 10.0  # rad/s — clips to [-1, 1] at this angular velocity
 IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
@@ -52,6 +54,16 @@ IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
 
 class GnociGymEnv(gym.Env):
     metadata = {'render_modes': ['rgb_array']}
+
+    DEFAULT_REWARD_COEFS = {
+        'stand':        1.0,
+        'velocity':     2.5,
+        'foot_contact': 0.5,
+        'foot_airtime': 0.5,
+        'orientation':  0.3,
+        'heading':      0.3,
+        'yoke_joint':   0.2,
+    }
 
     def __init__(
             self,
@@ -65,10 +77,12 @@ class GnociGymEnv(gym.Env):
             floor_tilt_range=0.0,
             action_filter_alpha=0.4,
             task='stand',
+            reward_coefs=None,
         ):
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
+        self.reward_coefs = {**self.DEFAULT_REWARD_COEFS, **(reward_coefs or {})}
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
@@ -136,6 +150,10 @@ class GnociGymEnv(gym.Env):
         ]
         self.comp_filter = ComplementaryFilter()
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
+        self._contact_buffer = deque([False] * grace_steps, maxlen=grace_steps)
+        self._foot_airtime = [0.0, 0.0]
+        self._foot_was_contact = [False, False]
 
     def _set_joint_positions(self, joint_positions):
         for jnt_name, pos in joint_positions.items():
@@ -219,29 +237,98 @@ class GnociGymEnv(gym.Env):
     def _get_velocity(self):
         return self.data.cvel[self.body_id][3:6]
 
-    def _get_reward(self):
+    def _get_foot_airtime_reward(self):
+        dt = 1.0 / self.control_hz
+        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        current = [
+            contacts[0] > 0 or contacts[1] > 0,  # left foot
+            contacts[2] > 0 or contacts[3] > 0,  # right foot
+        ]
+        reward = 0.0
+        for i, (in_contact, was_contact) in enumerate(zip(current, self._foot_was_contact)):
+            if not in_contact:
+                self._foot_airtime[i] += dt
+            elif not was_contact:  # touchdown
+                reward += self._foot_airtime[i] - 0.12
+                self._foot_airtime[i] = 0.0
+        self._foot_was_contact = current
+        return reward
+
+    def _get_stand_reward(self):
         upright = self._get_root_upright()
-        height = self._get_root_height()
+        height  = self._get_root_height()
         standing = tolerance(
             height,
             bounds=(_STANDING_HEIGHT, float('inf')),
-            margin=_STANDING_HEIGHT / 2
+            margin=_STANDING_HEIGHT / 2,
         )
         upright = (1 + upright) / 2
-        stand_reward = (3 * standing + upright) / 4
+        return (3 * standing + upright) / 4
+
+    def _get_velocity_reward(self):
+        velocity = self._get_velocity()
+        side_v = abs(velocity[0])
+        lateral_penalty = max(1.0 - 2.0 * side_v, 0.0)
+        forward_reward = tolerance(-velocity[1], bounds=(0.4, 0.6), margin=0.4)
+        return forward_reward * lateral_penalty
+
+    def _get_orientation_reward(self):
+        pitch = float(self.comp_filter.pitch)
+        roll  = float(self.comp_filter.roll)
+        return (
+            tolerance(pitch, bounds=(0, 0), margin=0.2) *
+            tolerance(roll,  bounds=(0, 0), margin=0.2)
+        )
+
+    def _get_yoke_joint_reward(self):
+        # Encourage head__left_yoke, left_yoke__hip, head__right_yoke, right_yoke__hip
+        # to stay near their default position of 0.0
+        positions = self._get_joint_positions()
+        yoke_indices = [0, 1, 5, 6]
+        return float(np.mean([
+            tolerance(float(positions[i]), bounds=(0.0, 0.0), margin=0.2)
+            for i in yoke_indices
+        ]))
+
+    def _get_heading_reward(self):
+        xmat = self.data.xmat[self.body_id]
+        # Body forward direction in world XY plane (-Y body axis, rewarded motion is -Y world)
+        body_forward = np.array([-xmat[3], -xmat[4]])
+        body_forward_norm = np.linalg.norm(body_forward)
+        if body_forward_norm < 1e-6:
+            return 0.0
+        body_forward = body_forward / body_forward_norm
+        return float((np.dot(body_forward, [0.0, -1.0]) + 1.0) / 2.0)
+
+    def _get_foot_contact_reward(self):
+        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        left  = contacts[0] > 0 or contacts[1] > 0
+        right = contacts[2] > 0 or contacts[3] > 0
+        single = left ^ right
+        self._contact_buffer.append(single)
+        return 1.0 if any(self._contact_buffer) else 0.0
+
+    def _get_reward(self):
+        c = self.reward_coefs
+        stand_reward = self._get_stand_reward()
 
         if self.task == 'walk':
-            velocity = self._get_velocity()
-            side_v = abs(velocity[0])
-            lateral_penalty = max(1.0 - 0.5 * side_v, 0.0)
-            velocity_reward = tolerance(
-                -velocity[1],
-                bounds=(0.3, 0.6),
-                margin=0.3
+            velocity_reward     = self._get_velocity_reward()
+            foot_contact_reward = self._get_foot_contact_reward()
+            foot_airtime_reward = self._get_foot_airtime_reward()
+            orientation_reward  = self._get_orientation_reward()
+            heading_reward      = self._get_heading_reward()
+            yoke_joint_reward   = self._get_yoke_joint_reward()
+            return (
+                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
+                + c['foot_contact'] * foot_contact_reward
+                + c['foot_airtime'] * foot_airtime_reward
+                + c['orientation']  * orientation_reward
+                + c['heading']      * heading_reward
+                + c['yoke_joint']   * yoke_joint_reward
             )
-            return stand_reward * (1 + velocity_reward * lateral_penalty)
 
-        return stand_reward
+        return c['stand'] * stand_reward
 
     def step(self, action):
         action = action.clip(-1, 1)
