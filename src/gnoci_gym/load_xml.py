@@ -18,8 +18,9 @@ def _expand_includes(root, desc_dir):
 def _load_and_perturb_basic_xml(
         filename,
         inertial_mass_range=(0.04, 0.06),
-        inertial_mass_noise=0.01,
+        inertial_mass_noise=0.03,
         floor_tilt_range=0.0,
+        floor_friction_range=(1.0, 1.0),
     ):
     package_dir = os.path.dirname(os.path.abspath(__file__))
     desc_dir    = os.path.join(package_dir, 'desc')
@@ -35,9 +36,17 @@ def _load_and_perturb_basic_xml(
     for child in xml_root.findall('.//geom'):
         if child.attrib.get('mass', '0') == '0':
             continue
-        inertial_mass_value = np.random.uniform(*inertial_mass_range) * float(child.attrib['mass']) * 0.1
-        new_val = max(float(child.attrib['mass']) + inertial_mass_value + np.random.normal(0, inertial_mass_noise), mujoco.mjMINVAL)
+        base = float(child.attrib['mass'])
+        inertial_mass_value = np.random.uniform(*inertial_mass_range) * base
+        new_val = max(base + inertial_mass_value + np.random.normal(0, inertial_mass_noise) * base, mujoco.mjMINVAL)
         child.attrib['mass'] = str(new_val)
+
+    for geom in xml_root.iter("geom"):
+        if geom.get("name") == "floor":
+            parts = geom.get("friction", "1.0 0.005 0.0001").split()
+            parts[0] = str(np.random.uniform(*floor_friction_range))
+            geom.set("friction", " ".join(parts))
+            break
 
     if floor_tilt_range > 0:
         roll  = np.random.uniform(-floor_tilt_range, floor_tilt_range)

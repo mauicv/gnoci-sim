@@ -73,8 +73,17 @@ class GnociGymEnv(gym.Env):
             max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
-            inertial_mass_noise=0.01,
+            inertial_mass_noise=0.03,
             floor_tilt_range=0.0,
+            floor_friction_range=(1.0, 1.0),
+            joint_friction_range=(0.1, 0.1),
+            joint_armature_range=(0.005, 0.005),
+            actuator_gain_range=(1.0, 1.0),
+            gravity_noise=0.0,
+            obs_noise_scale=0.0,
+            push_force_max=0.0,
+            push_interval_range=(2.0, 5.0),
+            max_action_delay=0,
             action_filter_alpha=0.4,
             task='stand',
             reward_coefs=None,
@@ -91,6 +100,15 @@ class GnociGymEnv(gym.Env):
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
         self.floor_tilt_range = floor_tilt_range
+        self.floor_friction_range = floor_friction_range
+        self.joint_friction_range = joint_friction_range
+        self.joint_armature_range = joint_armature_range
+        self.actuator_gain_range = actuator_gain_range
+        self.gravity_noise = gravity_noise
+        self.obs_noise_scale = obs_noise_scale
+        self.push_force_max = push_force_max
+        self.push_interval_range = push_interval_range
+        self.max_action_delay = max_action_delay
         self.action_filter_alpha = action_filter_alpha
         self.metadata['render_fps'] = control_hz
 
@@ -108,12 +126,18 @@ class GnociGymEnv(gym.Env):
         self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
 
+        self._push_step = 0
+        self._push_interval = self._sample_push_interval()
+        self._action_delay = 0
+        self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
+
     def initialize_model(self):
         xml_content = _load_and_perturb_basic_xml(
             'scene',
             inertial_mass_range=self.inertial_mass_range,
             inertial_mass_noise=self.inertial_mass_noise,
             floor_tilt_range=self.floor_tilt_range,
+            floor_friction_range=self.floor_friction_range,
         )
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.model.opt.timestep = PHYSICS_DT
@@ -148,6 +172,19 @@ class GnociGymEnv(gym.Env):
             self.model.sensor_adr[self.model.sensor(n).id]
             for n in ["imu-gyro", "imu-acc"]
         ]
+
+        for dof_addr in self.joint_dof_addrs:
+            self.model.dof_frictionloss[dof_addr] = np.random.uniform(*self.joint_friction_range)
+            self.model.dof_armature[dof_addr] = np.random.uniform(*self.joint_armature_range)
+
+        for i in range(self.model.nu):
+            scale = np.random.uniform(*self.actuator_gain_range)
+            self.model.actuator_gainprm[i, 0] *= scale
+            self.model.actuator_biasprm[i, 1] *= scale
+
+        if self.gravity_noise > 0:
+            self.model.opt.gravity[2] += np.random.normal(0, self.gravity_noise)
+
         self.comp_filter = ComplementaryFilter()
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
         grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
@@ -178,6 +215,11 @@ class GnociGymEnv(gym.Env):
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
+    def _sample_push_interval(self):
+        lo = int(self.push_interval_range[0] * self.control_hz)
+        hi = int(self.push_interval_range[1] * self.control_hz)
+        return np.random.randint(lo, hi + 1)
+
     def reset(self, seed=None, **kwargs):
         self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
@@ -187,6 +229,17 @@ class GnociGymEnv(gym.Env):
         mujoco.mj_forward(self.model, self.data)
         self.comp_filter.reset()
         self.done = False
+
+        self._push_step = 0
+        self._push_interval = self._sample_push_interval()
+
+        if self.max_action_delay > 0:
+            self._action_delay = np.random.randint(0, self.max_action_delay + 1)
+            self._action_buffer = deque(
+                [np.zeros(_N_JOINTS, dtype=np.float32)] * (self._action_delay + 1),
+                maxlen=self._action_delay + 1,
+            )
+
         return self._get_obs(), {}
 
     def _get_joint_positions(self):
@@ -208,6 +261,8 @@ class GnociGymEnv(gym.Env):
             *(acc / IMU_ACC_SCALE),
             *self._get_pitch_and_roll(gyro, acc),
         ])
+        if self.obs_noise_scale > 0:
+            obs += np.random.normal(0, self.obs_noise_scale, obs.shape)
         return obs.astype(np.float32)
 
     def _get_info(self):
@@ -332,6 +387,22 @@ class GnociGymEnv(gym.Env):
 
     def step(self, action):
         action = action.clip(-1, 1)
+
+        if self.max_action_delay > 0:
+            self._action_buffer.append(action.copy())
+            action = self._action_buffer[0]
+
+        if self.push_force_max > 0:
+            self.data.xfrc_applied[self.body_id] = 0
+            self._push_step += 1
+            if self._push_step >= self._push_interval:
+                fx = np.random.uniform(-self.push_force_max, self.push_force_max)
+                fy = np.random.uniform(-self.push_force_max, self.push_force_max)
+                self.data.xfrc_applied[self.body_id, 3] = fx
+                self.data.xfrc_applied[self.body_id, 4] = fy
+                self._push_step = 0
+                self._push_interval = self._sample_push_interval()
+
         for i in range(self.model.nu):
             delta = self.action_filters[i].update(action[i]) * self.action_scale
             lo, hi = self.joint_ranges[i]
