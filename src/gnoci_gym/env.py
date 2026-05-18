@@ -272,7 +272,8 @@ class GnociGymEnv(gym.Env):
                 maxlen=self._action_delay + 1,
             )
 
-        return self._get_obs(), {}
+        noisey_state, state = self._get_obs()
+        return noisey_state, {'state': state}
 
     def _get_joint_positions(self):
         return self.data.sensordata[self.joint_pos_sensor_addrs]
@@ -294,8 +295,10 @@ class GnociGymEnv(gym.Env):
             *self._get_pitch_and_roll(gyro, acc),
         ])
         if self.obs_noise_scale > 0:
-            obs += np.random.normal(0, self.obs_noise_scale, obs.shape)
-        return obs.astype(np.float32)
+            noisey_obs = obs + np.random.normal(0, self.obs_noise_scale, obs.shape)
+        else:
+            noisey_obs = obs
+        return noisey_obs.astype(np.float32), obs.astype(np.float32)
 
     def _get_info(self):
         return {}
@@ -441,11 +444,11 @@ class GnociGymEnv(gym.Env):
             self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
-        state = self._get_obs()
+        state, noisey_state = self._get_obs()
         reward = self._get_reward()
         if self.overturned():
             self.done = True
-        return (state, reward, self.done, self.done, {})
+        return (noisey_state, reward, self.done, self.done, {'state': state})
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':
