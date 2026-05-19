@@ -68,19 +68,19 @@ test_cfg = dict(
 )
 
 dom_rnd_cfg = dict(
-    initial_randomness=0.1,
-    inertial_mass_range=(0.04, 0.06),
-    inertial_mass_noise=0.03,
-    floor_tilt_range=0.04,
-    floor_friction_range=(0.5, 1.5),
-    joint_friction_range=(0.05, 0.2),
-    joint_armature_range=(0.003, 0.01),
-    actuator_gain_range=(0.85, 1.15),
-    gravity_noise=0.2,
+    initial_randomness=0.05,
+    inertial_mass_range=(0.02, 0.04),
+    inertial_mass_noise=0.01,
+    floor_tilt_range=0.02,
+    floor_friction_range=(0.7, 1.3),
+    joint_friction_range=(0.07, 0.15),
+    joint_armature_range=(0.004, 0.008),
+    actuator_gain_range=(0.9, 1.1),
+    gravity_noise=0.1,
     obs_noise_scale=0.01,
-    push_force_max=3.0,
-    push_interval_range=(2.0, 5.0),
-    max_action_delay=2,
+    push_force_max=1.0,
+    push_interval_range=(3.0, 6.0),
+    max_action_delay=1,
 )
 
 
