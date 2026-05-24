@@ -26,7 +26,7 @@ _OBS_DIM  = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2  # 32
 
 class ReferenceEnv:
 
-    def __init__(self, task='walk', control_hz=60, period=1.0, frame_stack=1):
+    def __init__(self, task='walk', control_hz=80, period=1.0, frame_stack=1):
         if task not in _REFERENCE_XML:
             raise ValueError(f"No reference trajectory for task '{task}'. Supported: {list(_REFERENCE_XML)}")
         self.task = task

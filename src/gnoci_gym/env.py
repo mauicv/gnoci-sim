@@ -7,7 +7,7 @@ from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
 
-_STANDING_HEIGHT = 0.235  # TODO: calibrate once robot is simulating
+_STANDING_HEIGHT = 0.235
 
 _JOINT_NAMES = [
     'head__left_yoke',
@@ -44,6 +44,12 @@ _TOUCH_SENSOR_NAMES = [
 
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
+
+_DEFAULT_JOINT_POS_ARRAY = np.array(
+    [_DEFAULT_JOINT_POSITIONS[j] if _DEFAULT_JOINT_POSITIONS[j] is not None else 0.0
+     for j in _JOINT_NAMES],
+    dtype=np.float32,
+)
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
@@ -90,18 +96,18 @@ class GnociGymEnv(gym.Env):
     DEFAULT_REWARD_COEFS = {
         'stand':        1.0,
         'velocity':     2.5,
-        'foot_contact': 0.5,
+        'foot_contact': 0.0,
         'foot_airtime': 0.5,
-        'orientation':  0.3,
+        'orientation':  1.0,
         'heading':      0.3,
-        'yoke_joint':   0.2,
+        'yoke_joint':   1.0,
     }
 
     def __init__(
             self,
             camera='track',
             render_mode='rgb_array',
-            control_hz=40,
+            control_hz=80,
             max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
@@ -286,9 +292,11 @@ class GnociGymEnv(gym.Env):
 
     def _get_obs(self):
         gyro, acc = self._get_imu_data()
+        joint_pos = (self._get_joint_positions() - _DEFAULT_JOINT_POS_ARRAY) / np.pi
+        joint_vel = self._get_joint_velocities() / np.pi
         obs = np.array([
-            *self._get_joint_positions(),
-            *self._get_joint_velocities(),
+            *joint_pos,
+            *joint_vel,
             *self._get_contact_forces(),
             *(gyro / IMU_GYRO_SCALE),
             *(acc / IMU_ACC_SCALE),
