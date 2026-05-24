@@ -7,7 +7,7 @@ from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
 
-_STANDING_HEIGHT = 0.235
+_STANDING_HEIGHT = 0.185
 
 _JOINT_NAMES = [
     'head__left_yoke',
@@ -23,16 +23,16 @@ _JOINT_NAMES = [
 ]
 
 _DEFAULT_JOINT_POSITIONS: dict[str, float] = {
-    "head__left_yoke":            None,
-    "left_yoke__hip":             None,
-    "left_hip__upper_leg":        -0.6,
-    "left_upper_leg__lower_leg":  1.4,
-    "left_lower_leg__foot":       0.75,
-    "head__right_yoke":           None,
-    "right_yoke__hip":            None,
-    "right_hip__upper_leg":        0.6,
-    "right_upper_leg__lower_leg":  -1.4,
-    "right_lower_leg__foot":       -0.75,
+    'head__left_yoke': 0,
+    'left_yoke__hip': 0,
+    'left_hip__upper_leg': 0.3,
+    'left_upper_leg__lower_leg': -0.6,
+    'left_lower_leg__foot': -0.3,
+    'head__right_yoke': 0,
+    'right_yoke__hip': 0,
+    'right_hip__upper_leg': 0.3,
+    'right_upper_leg__lower_leg': -0.6,
+    'right_lower_leg__foot': -0.3
 }
 
 _TOUCH_SENSOR_NAMES = [
@@ -235,7 +235,7 @@ class GnociGymEnv(gym.Env):
             if pos is None:
                 continue
             qpos_addr = self.model.jnt_qposadr[self.model.joint(jnt_name).id]
-            self.data.qpos[qpos_addr] = pos
+            self.data.qpos[qpos_addr] = pos * np.pi
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
@@ -292,7 +292,7 @@ class GnociGymEnv(gym.Env):
 
     def _get_obs(self):
         gyro, acc = self._get_imu_data()
-        joint_pos = (self._get_joint_positions() - _DEFAULT_JOINT_POS_ARRAY) / np.pi
+        joint_pos = self._get_joint_positions() / np.pi - _DEFAULT_JOINT_POS_ARRAY
         joint_vel = self._get_joint_velocities() / np.pi
         obs = np.array([
             *joint_pos,

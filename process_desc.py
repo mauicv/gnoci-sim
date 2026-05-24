@@ -35,6 +35,16 @@ SITE_SIZE = 0.01      # metres
 
 ACTUATOR_CLASS = "miuzei_25kg"
 
+# Left-side joints whose axis and range are flipped so that positive motion
+# means the same physical direction as the corresponding right-side joint.
+LEFT_JOINTS = {
+    "head__left_yoke",
+    "left_yoke__hip",
+    "left_hip__upper_leg",
+    "left_upper_leg__lower_leg",
+    "left_lower_leg__foot",
+}
+
 # Touch sensor site size (metres).  Sites sit ~0.035 m above the floor contact
 # surface; 0.04 m radius reaches the floor (0.035 m away) but not the opposite
 # site (~0.063 m away), giving clean front/back separation.
@@ -180,6 +190,17 @@ def process(src, dst):
             actuator.set("class", ACTUATOR_CLASS)
             actuator.attrib["inheritrange"] = "1"
             actuator.attrib.pop("ctrlrange", None)
+
+    # ── flip left-side joint axes and ranges ─────────────────────────────────
+    for joint in root.iter("joint"):
+        if joint.get("name") not in LEFT_JOINTS:
+            continue
+        axis = joint.get("axis", "0 0 1")
+        joint.set("axis", " ".join(str(-float(x)) for x in axis.split()))
+        rng = joint.get("range")
+        if rng:
+            lo, hi = map(float, rng.split())
+            joint.set("range", f"{-hi} {-lo}")
 
     # ── strip collision geoms for cosmetic / sensor parts ────────────────────
     removed = 0

@@ -33,7 +33,7 @@
       <geom type="mesh" class="visual" pos="0.0352673 -0.0415894 0.0171252" quat="1 0 0 0" mesh="head_top" material="head_top_material" mass="0.08" />
       <geom type="mesh" class="collision" pos="0.0352673 -0.0415894 0.0171252" quat="1 0 0 0" mesh="head_top" material="head_top_material" mass="0.08" />
       <body name="left_yoke_lower_frame" pos="0.0962673 -0.0419394 0.0535752" quat="1 -0 0 -0">
-        <joint axis="0 0 1" name="head__left_yoke" type="hinge" range="-0.6108652381980153 0.6108652381980153" />
+        <joint axis="-0.0 -0.0 -1.0" name="head__left_yoke" type="hinge" range="-0.6108652381980153 0.6108652381980153" />
         <geom type="mesh" class="visual" pos="-0.061 0.00015 -0.03575" quat="1 0 0 -0" mesh="left_yoke_r_sense" material="left_yoke_r_sense_material" mass="1e-05" />
         <geom type="mesh" class="visual" pos="-0.061 0.0001 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_servo" material="left_yoke_servo_material" mass="0.063" />
         <geom type="mesh" class="visual" pos="-0.061 0 -0.03575" quat="1 0 0 0" mesh="left_yoke_upper_frame" material="left_yoke_upper_frame_material" mass="0.01" />
@@ -41,7 +41,7 @@
         <geom type="mesh" class="collision" pos="-0.061 0 -0.03605" quat="1 0 0 0" mesh="head_servo_horn_left" material="head_servo_horn_left_material" mass="0.063" />
         <geom type="mesh" class="visual" pos="-0.061 0.00015 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_lower_frame" material="left_yoke_lower_frame_material" mass="0.02" />
         <body name="left_hip_back" pos="0.01 -0.03 -0.0147" quat="0.707107 -0.707107 0 -0">
-          <joint axis="0 0 1" name="left_yoke__hip" type="hinge" range="-0.6981317007977282 0.3316125578789262" />
+          <joint axis="-0.0 -0.0 -1.0" name="left_yoke__hip" type="hinge" range="-0.3316125578789262 0.6981317007977282" />
           <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_back" material="left_hip_back_material" mass="0.023" />
           <geom type="mesh" class="collision" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_back" material="left_hip_back_material" mass="0.023" />
           <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_servo" material="left_hip_servo_material" mass="0.063" />
@@ -51,7 +51,7 @@
           <geom type="mesh" class="visual" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_front" material="left_hip_front_material" mass="0.036" />
           <geom type="mesh" class="collision" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_front" material="left_hip_front_material" mass="0.036" />
           <body name="left_upper_leg" pos="0.0755 -0.00365213 0.0301319" quat="0.707107 0 -0.707107 0">
-            <joint axis="0 0 1" name="left_hip__upper_leg" type="hinge" range="-1.570796326794894 2.6645352591003757e-15" />
+            <joint axis="-0.0 -0.0 -1.0" name="left_hip__upper_leg" type="hinge" range="-2.6645352591003757e-15 1.570796326794894" />
             <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1471" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_r_sense" material="left_upper_leg_r_sense_material" mass="1e-05" />
             <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1468" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg" material="left_upper_leg_material" mass="0.067" />
             <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1468" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg" material="left_upper_leg_material" mass="0.067" />
@@ -59,7 +59,7 @@
             <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1465" quat="0.5 0.5 0.5 -0.5" mesh="left_hip_servo_horn" material="left_hip_servo_horn_material" mass="0.063" />
             <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1465" quat="0.5 0.5 0.5 -0.5" mesh="left_hip_servo_horn" material="left_hip_servo_horn_material" mass="0.063" />
             <body name="left_lower_leg" pos="-0 0.14 -0.0021" quat="1 -0 -0 0">
-              <joint axis="0 0 1" name="left_upper_leg__lower_leg" type="hinge" range="-0.17453292519943028 2.1816615649929147" />
+              <joint axis="-0.0 -0.0 -1.0" name="left_upper_leg__lower_leg" type="hinge" range="-2.1816615649929147 0.17453292519943028" />
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_servo" material="left_lower_leg_servo_material" mass="0.063" />
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1489" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_servo_horn" material="left_upper_leg_servo_horn_material" mass="0.063" />
               <geom type="mesh" class="collision" pos="0.000268125 -0.115 0.1489" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_servo_horn" material="left_upper_leg_servo_horn_material" mass="0.063" />
@@ -69,7 +69,7 @@
               <geom type="mesh" class="visual" pos="0.000468125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_2" material="left_lower_leg_c_sense_2_material" mass="1e-05" />
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_r_sense" material="left_lower_leg_r_sense_material" mass="1e-05" />
               <body name="left_foot_base" pos="0 0.14 0.0426" quat="0 -1 0 -0">
-                <joint axis="0 0 1" name="left_lower_leg__foot" type="hinge" range="-1.3962634015954618 1.3962634015954654" />
+                <joint axis="-0.0 -0.0 -1.0" name="left_lower_leg__foot" type="hinge" range="-1.3962634015954654 1.3962634015954618" />
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material" />
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material" />
                 <geom type="mesh" class="visual" pos="0.000268105 0.257213 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material" mass="0.023" />
