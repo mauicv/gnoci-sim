@@ -25,14 +25,14 @@ _JOINT_NAMES = [
 _DEFAULT_JOINT_POSITIONS: dict[str, float] = {
     'head__left_yoke': 0,
     'left_yoke__hip': 0,
-    'left_hip__upper_leg': 0.3,
-    'left_upper_leg__lower_leg': -0.6,
-    'left_lower_leg__foot': -0.3,
+    'left_hip__upper_leg': 0.3 * 0.75,
+    'left_upper_leg__lower_leg': -0.6 * 0.75,
+    'left_lower_leg__foot': -0.3 * 0.75,
     'head__right_yoke': 0,
     'right_yoke__hip': 0,
-    'right_hip__upper_leg': 0.3,
-    'right_upper_leg__lower_leg': -0.6,
-    'right_lower_leg__foot': -0.3
+    'right_hip__upper_leg': 0.3 * 0.75,
+    'right_upper_leg__lower_leg': -0.6 * 0.75,
+    'right_lower_leg__foot': -0.3 * 0.75
 }
 
 _TOUCH_SENSOR_NAMES = [
@@ -125,6 +125,7 @@ class GnociGymEnv(gym.Env):
             action_filter_alpha=0.4,
             task='stand',
             reward_coefs=None,
+            fix_root_body=False,
         ):
         self.camera = camera
         self.render_mode = render_mode
@@ -148,6 +149,7 @@ class GnociGymEnv(gym.Env):
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
         self.action_filter_alpha = action_filter_alpha
+        self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
         self.observation_space = gym.spaces.Box(
@@ -176,6 +178,7 @@ class GnociGymEnv(gym.Env):
             inertial_mass_noise=self.inertial_mass_noise,
             floor_tilt_range=self.floor_tilt_range,
             floor_friction_range=self.floor_friction_range,
+            fix_root_body=self.fix_root_body,
         )
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.model.opt.timestep = PHYSICS_DT
@@ -196,8 +199,12 @@ class GnociGymEnv(gym.Env):
         self.body_id = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_BODY, "head_base"
         )
-        self.floor_geom_id = self.model.geom("floor").id
-        self.floor_z = self.model.geom_pos[self.floor_geom_id][2]
+        try:
+            self.floor_geom_id = self.model.geom("floor").id
+            self.floor_z = self.model.geom_pos[self.floor_geom_id][2]
+        except KeyError:
+            self.floor_geom_id = -1
+            self.floor_z = 0.0
         self.joint_qpos_addrs = [
             self.model.jnt_qposadr[self.model.joint(j).id]
             for j in _JOINT_NAMES

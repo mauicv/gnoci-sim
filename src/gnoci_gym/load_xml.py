@@ -21,6 +21,7 @@ def _load_and_perturb_basic_xml(
         inertial_mass_noise=0.03,
         floor_tilt_range=0.0,
         floor_friction_range=(1.0, 1.0),
+        fix_root_body=False,
     ):
     package_dir = os.path.dirname(os.path.abspath(__file__))
     desc_dir    = os.path.join(package_dir, 'desc')
@@ -29,6 +30,15 @@ def _load_and_perturb_basic_xml(
 
     xml_root = ET.parse(xml_path).getroot()
     _expand_includes(xml_root, desc_dir)
+
+    if fix_root_body:
+        for body in xml_root.iter("body"):
+            for fj in list(body.findall("freejoint")):
+                body.remove(fj)
+        for parent in xml_root.iter():
+            for child in list(parent):
+                if child.tag == "geom" and child.get("name") == "floor":
+                    parent.remove(child)
 
     for compiler in xml_root.iter('compiler'):
         compiler.set('meshdir', assets_dir)
