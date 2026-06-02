@@ -16,8 +16,10 @@ JOINTS = [
     "right_lower_leg__foot",
 ]
 
-REAL_COLOR = "#2563EB"
-SIM_COLOR  = "#EA580C"
+REAL_POS_COLOR = "#2563EB"
+SIM_POS_COLOR  = "#EA580C"
+REAL_VEL_COLOR = "#7C3AED"
+SIM_VEL_COLOR  = "#059669"
 
 def format_joint_name(name):
     a, b = name.split("__")
@@ -42,7 +44,6 @@ plt.rcParams.update({
     "font.family": "sans-serif",
     "font.size": 8,
     "axes.spines.top": False,
-    "axes.spines.right": False,
     "axes.grid": True,
     "grid.color": "#E5E7EB",
     "grid.linewidth": 0.6,
@@ -62,14 +63,6 @@ fig, axs = plt.subplots(4, 5, figsize=(18, 9), sharex=False)
 fig.suptitle("Joint Step Response — Real vs Simulated", fontsize=12, fontweight="bold",
              color="#111827", y=0.995)
 
-# Row header labels: (row, label)
-row_labels = [
-    (0, "Left  ·  action = −1"),
-    (1, "Left  ·  action = +1"),
-    (2, "Right  ·  action = −1"),
-    (3, "Right  ·  action = +1"),
-]
-
 k = 0
 for i, joint in enumerate(JOINTS):
     for j, action in enumerate([-1, 1]):
@@ -77,44 +70,55 @@ for i, joint in enumerate(JOINTS):
             k = 2
         row = j + k
         ax = axs[row, i % 5]
+        ax_v = ax.twinx()
 
-        t_real, pos_real, _ = get_entry(real_data, joint, action)
-        t_sim,  pos_sim,  _ = get_entry(sim_data,  joint, action)
+        t_real, pos_real, vel_real = get_entry(real_data, joint, action)
+        t_sim,  pos_sim,  vel_sim  = get_entry(sim_data,  joint, action)
 
         if t_real is not None:
-            ax.plot(t_real, pos_real, color=REAL_COLOR, linewidth=1.4,
-                    label="Real", zorder=3)
+            ax.plot(t_real, pos_real, color=REAL_POS_COLOR, linewidth=1.4,
+                    label="Real pos", zorder=3)
+            ax_v.plot(t_real, vel_real, color=REAL_VEL_COLOR, linewidth=1.0,
+                      linestyle=":", label="Real vel", zorder=2)
         if t_sim is not None:
-            ax.plot(t_sim, pos_sim, color=SIM_COLOR, linewidth=1.4,
-                    linestyle="--", label="Sim", zorder=2)
+            ax.plot(t_sim, pos_sim, color=SIM_POS_COLOR, linewidth=1.4,
+                    linestyle="--", label="Sim pos", zorder=3)
+            ax_v.plot(t_sim, vel_sim, color=SIM_VEL_COLOR, linewidth=1.0,
+                      linestyle=(0, (3, 1, 1, 1)), label="Sim vel", zorder=2)
 
         ax.set_title(format_joint_name(joint))
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(4, integer=False))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax_v.yaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.tick_params(length=2)
+        ax_v.tick_params(length=2)
+
+        ax.spines["top"].set_visible(False)
+        ax_v.spines["top"].set_visible(False)
+
+        # Only show right-side vel axis on the last column of each group
+        if i % 5 == 4:
+            ax_v.set_ylabel("vel (×π rad/s)", labelpad=4, color="#6B7280", fontsize=7)
+            ax_v.yaxis.label.set_color("#6B7280")
+            ax_v.tick_params(colors="#6B7280")
+        else:
+            ax_v.set_yticks([])
+            ax_v.spines["right"].set_visible(False)
 
         if i % 5 == 0:
             ax.set_ylabel("pos (×π rad)", labelpad=4)
         if row == 3 or (row == 1 and i < 5):
             ax.set_xlabel("time (s)", labelpad=3)
 
-    k = 0  # reset after first joint; set again when i >= 5
+    k = 0
 
-# Row labels on far-left edge
-for row, label in row_labels:
-    fig.text(
-        0.005, 1 - (row + 0.5) / 4,
-        label, va="center", ha="left",
-        fontsize=7.5, color="#6B7280",
-        rotation=90, transform=fig.transFigure,
-    )
-
-# Shared legend in an empty corner area
 handles = [
-    plt.Line2D([0], [0], color=REAL_COLOR, linewidth=1.6, label="Real"),
-    plt.Line2D([0], [0], color=SIM_COLOR,  linewidth=1.6, linestyle="--", label="Simulated"),
+    plt.Line2D([0], [0], color=REAL_POS_COLOR, linewidth=1.6,                       label="Real pos"),
+    plt.Line2D([0], [0], color=SIM_POS_COLOR,  linewidth=1.6, linestyle="--",       label="Sim pos"),
+    plt.Line2D([0], [0], color=REAL_VEL_COLOR, linewidth=1.2, linestyle=":",        label="Real vel"),
+    plt.Line2D([0], [0], color=SIM_VEL_COLOR,  linewidth=1.2, linestyle=(0,(3,1,1,1)), label="Sim vel"),
 ]
-fig.legend(handles=handles, loc="lower center", ncol=2,
+fig.legend(handles=handles, loc="lower center", ncol=4,
            frameon=True, framealpha=0.9, edgecolor="#D1D5DB",
            fontsize=9, bbox_to_anchor=(0.5, -0.01))
 
