@@ -10,6 +10,7 @@ from .env import (
     IMU_ACC_SCALE,
     _JOINT_NAMES,
     _TOUCH_SENSOR_NAMES,
+    _DEFAULT_JOINT_POS_ARRAY,
 )
 from .filters import ComplementaryFilter
 from .load_xml import _load_and_perturb_basic_xml
@@ -26,7 +27,7 @@ _OBS_DIM  = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2  # 32
 
 class ReferenceEnv:
 
-    def __init__(self, task='walk', control_hz=60, period=1.0, frame_stack=1):
+    def __init__(self, task='walk', control_hz=80, period=1.0, frame_stack=1):
         if task not in _REFERENCE_XML:
             raise ValueError(f"No reference trajectory for task '{task}'. Supported: {list(_REFERENCE_XML)}")
         self.task = task
@@ -97,9 +98,12 @@ class ReferenceEnv:
             acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
             self.comp_filter.update(acc, gyro, dt=PHYSICS_DT)
 
+            joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[i] for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
+            joint_vel = self.data.qvel[self.joint_dof_addrs] / np.pi
+
             dataset[i] = np.array([
-                *self.data.sensordata[self.joint_pos_sensor_addrs],
-                *self.data.qvel[self.joint_dof_addrs],
+                *joint_pos,
+                *joint_vel,
                 *(self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32),
                 *(gyro / IMU_GYRO_SCALE),
                 *(acc / IMU_ACC_SCALE),

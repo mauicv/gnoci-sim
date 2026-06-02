@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import math
 import os
 import shutil
 import xml.etree.ElementTree as ET
@@ -34,6 +35,44 @@ TOUCH_OFFSET = 0.02   # metres
 SITE_SIZE = 0.01      # metres
 
 ACTUATOR_CLASS = "miuzei_25kg"
+
+# Joint limits as (lo, hi) offsets from the default position, in units of π rad.
+# Absolute range written to XML = (default + offset) * π.
+_JOINT_DEFAULTS: dict[str, float] = {
+    'head__left_yoke':              0,
+    'left_yoke__hip':               0,
+    'left_hip__upper_leg':          0.3 * 0.75,
+    'left_upper_leg__lower_leg':    -0.6 * 0.75,
+    'left_lower_leg__foot':         -0.3 * 0.75,
+    'head__right_yoke':             0,
+    'right_yoke__hip':              0,
+    'right_hip__upper_leg':         0.3 * 0.75,
+    'right_upper_leg__lower_leg':   -0.6 * 0.75,
+    'right_lower_leg__foot':        -0.3 * 0.75,
+}
+
+_JOINT_LIMITS: dict[str, tuple[float, float]] = {
+    'head__left_yoke':            (-0.3000,  0.2250),
+    'left_yoke__hip':             (-0.1500,  0.2250),
+    'left_hip__upper_leg':        (-0.3000,  0.4500),
+    'left_upper_leg__lower_leg':  (-0.3000,  0.4500),
+    'left_lower_leg__foot':       (-0.3000,  0.5250),
+    'head__right_yoke':           (-0.3000,  0.2250),
+    'right_yoke__hip':            (-0.1500,  0.2250),
+    'right_hip__upper_leg':       (-0.3000,  0.4500),
+    'right_upper_leg__lower_leg': (-0.3000,  0.4500),
+    'right_lower_leg__foot':      (-0.3000,  0.5250),
+}
+
+# Left-side joints whose axis and range are flipped so that positive motion
+# means the same physical direction as the corresponding right-side joint.
+LEFT_JOINTS = {
+    "head__left_yoke",
+    "left_yoke__hip",
+    "left_hip__upper_leg",
+    "left_upper_leg__lower_leg",
+    "left_lower_leg__foot",
+}
 
 # Touch sensor site size (metres).  Sites sit ~0.035 m above the floor contact
 # surface; 0.04 m radius reaches the floor (0.035 m away) but not the opposite
@@ -180,6 +219,30 @@ def process(src, dst):
             actuator.set("class", ACTUATOR_CLASS)
             actuator.attrib["inheritrange"] = "1"
             actuator.attrib.pop("ctrlrange", None)
+
+    # ── flip left-side joint axes and ranges ─────────────────────────────────
+    for joint in root.iter("joint"):
+        if joint.get("name") not in LEFT_JOINTS:
+            continue
+        axis = joint.get("axis", "0 0 1")
+        joint.set("axis", " ".join(str(-float(x)) for x in axis.split()))
+        rng = joint.get("range")
+        if rng:
+            lo, hi = map(float, rng.split())
+            joint.set("range", f"{-hi} {-lo}")
+
+    # ── set joint ranges ─────────────────────────────────────────────────────
+    # Range = (default + relative_offset) * π, applied after axis flip so the
+    # absolute qpos bounds are consistent for both left and right joints.
+    for joint in root.iter("joint"):
+        name = joint.get("name")
+        if name not in _JOINT_LIMITS:
+            continue
+        default = _JOINT_DEFAULTS[name]
+        lo_rel, hi_rel = _JOINT_LIMITS[name]
+        lo = (default + lo_rel) * math.pi
+        hi = (default + hi_rel) * math.pi
+        joint.set("range", f"{lo:.10f} {hi:.10f}")
 
     # ── strip collision geoms for cosmetic / sensor parts ────────────────────
     removed = 0
