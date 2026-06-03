@@ -56,7 +56,7 @@ def main():
         action_filter_alpha=0.0,
         control_hz=40,
         max_joint_vel=6.0,
-        fix_root_body=True,
+        fix_root_body=False,
     )
     env.reset(seed=0)
     apply_overrides(env.model, args)
