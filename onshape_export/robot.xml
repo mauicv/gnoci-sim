@@ -18,7 +18,7 @@
   <worldbody>
     <!-- Link head_base -->
     <body name="head_base" pos="0 0 0" quat="1 0 0 0" childclass="onshape_export">
-      <inertial pos="0.0339281 -0.0535115 0.0917609" mass="0.690343" fullinertia="0.00151807 0.00226357 0.00188355 -1.05075e-05 1.73393e-05 9.60998e-05"/>
+      <inertial pos="0.0339288 -0.05351 0.0917777" mass="0.690656" fullinertia="0.00151742 0.00226472 0.00188638 -1.05099e-05 1.73196e-05 9.60235e-05"/>
       <!-- Part head_servo_left -->
       <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0175252" quat="1 -0 -0 0" mesh="head_servo_left" material="head_servo_left_material"/>
       <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0175252" quat="1 -0 -0 0" mesh="head_servo_left" material="head_servo_left_material"/>
@@ -35,8 +35,8 @@
       <geom type="mesh" class="visual" pos="0.0357205 -0.0415894 0.0169139" quat="1 -0 -0 -0" mesh="head_fan" material="head_fan_material"/>
       <geom type="mesh" class="collision" pos="0.0357205 -0.0415894 0.0169139" quat="1 -0 -0 -0" mesh="head_fan" material="head_fan_material"/>
       <!-- Part head_r_sense_left -->
-      <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_r_sense_left" material="head_r_sense_left_material"/>
-      <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_r_sense_left" material="head_r_sense_left_material"/>
+      <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0166252" quat="1 0 0 0" mesh="head_r_sense_left" material="head_r_sense_left_material"/>
+      <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0166252" quat="1 0 0 0" mesh="head_r_sense_left" material="head_r_sense_left_material"/>
       <!-- Part head_midframe -->
       <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_midframe" material="head_midframe_material"/>
       <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_midframe" material="head_midframe_material"/>
@@ -47,8 +47,8 @@
       <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_main" material="head_main_material"/>
       <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_main" material="head_main_material"/>
       <!-- Part head_r_sense_right -->
-      <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_r_sense_right" material="head_r_sense_right_material"/>
-      <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0171252" quat="1 0 0 0" mesh="head_r_sense_right" material="head_r_sense_right_material"/>
+      <geom type="mesh" class="visual" pos="0.0352673 -0.0419394 0.0166252" quat="1 0 0 0" mesh="head_r_sense_right" material="head_r_sense_right_material"/>
+      <geom type="mesh" class="collision" pos="0.0352673 -0.0419394 0.0166252" quat="1 0 0 0" mesh="head_r_sense_right" material="head_r_sense_right_material"/>
       <!-- Part head_voltmeter -->
       <geom type="mesh" class="visual" pos="0.0352673 -0.0415894 0.0171252" quat="1 0 0 0" mesh="head_voltmeter" material="head_voltmeter_material"/>
       <geom type="mesh" class="collision" pos="0.0352673 -0.0415894 0.0171252" quat="1 0 0 0" mesh="head_voltmeter" material="head_voltmeter_material"/>
@@ -68,16 +68,16 @@
       <body name="left_yoke_lower_frame" pos="0.0962673 -0.0419394 0.0535752" quat="1 -0 0 -0">
         <!-- Joint from head_base to left_yoke_lower_frame -->
         <joint axis="0 0 1" name="head__left_yoke" type="hinge" range="-0.6108652381980153 0.6108652381980153"/>
-        <inertial pos="-0.000323007 0.00081141 -0.0141845" mass="0.112882" fullinertia="2.94183e-05 3.44405e-05 4.67007e-05 5.81911e-07 1.42592e-07 8.4482e-08"/>
+        <inertial pos="-0.000324895 0.00112343 -0.01422" mass="0.111396" fullinertia="2.8549e-05 3.34805e-05 4.49837e-05 5.70742e-07 1.39543e-07 1.22214e-07"/>
         <!-- Part left_yoke_r_sense -->
-        <geom type="mesh" class="visual" pos="-0.061 0.00015 -0.03575" quat="1 0 0 -0" mesh="left_yoke_r_sense" material="left_yoke_r_sense_material"/>
-        <geom type="mesh" class="collision" pos="-0.061 0.00015 -0.03575" quat="1 0 0 -0" mesh="left_yoke_r_sense" material="left_yoke_r_sense_material"/>
+        <geom type="mesh" class="visual" pos="-0.061 0.00015 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_r_sense" material="left_yoke_r_sense_material"/>
+        <geom type="mesh" class="collision" pos="-0.061 0.00015 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_r_sense" material="left_yoke_r_sense_material"/>
         <!-- Part left_yoke_servo -->
         <geom type="mesh" class="visual" pos="-0.061 0.0001 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_servo" material="left_yoke_servo_material"/>
         <geom type="mesh" class="collision" pos="-0.061 0.0001 -0.03575" quat="1 0 -0 -0" mesh="left_yoke_servo" material="left_yoke_servo_material"/>
         <!-- Part left_yoke_upper_frame -->
-        <geom type="mesh" class="visual" pos="-0.061 0 -0.03575" quat="1 0 0 0" mesh="left_yoke_upper_frame" material="left_yoke_upper_frame_material"/>
-        <geom type="mesh" class="collision" pos="-0.061 0 -0.03575" quat="1 0 0 0" mesh="left_yoke_upper_frame" material="left_yoke_upper_frame_material"/>
+        <geom type="mesh" class="visual" pos="-0.061 0 -0.03575" quat="1 0 0 -0" mesh="left_yoke_upper_frame" material="left_yoke_upper_frame_material"/>
+        <geom type="mesh" class="collision" pos="-0.061 0 -0.03575" quat="1 0 0 -0" mesh="left_yoke_upper_frame" material="left_yoke_upper_frame_material"/>
         <!-- Part head_servo_horn_left -->
         <geom type="mesh" class="visual" pos="-0.061 0 -0.03605" quat="1 0 0 0" mesh="head_servo_horn_left" material="head_servo_horn_left_material"/>
         <geom type="mesh" class="collision" pos="-0.061 0 -0.03605" quat="1 0 0 0" mesh="head_servo_horn_left" material="head_servo_horn_left_material"/>
@@ -87,31 +87,31 @@
         <!-- Link left_hip_back -->
         <body name="left_hip_back" pos="0.01 -0.03 -0.0147" quat="0.707107 -0.707107 0 -0">
           <!-- Joint from left_yoke_lower_frame to left_hip_back -->
-          <joint axis="0 0 1" name="left_yoke__hip" type="hinge" range="-0.6981317007977282 0.3316125578789262"/>
-          <inertial pos="0.043463 0.0041791 0.0206854" mass="0.244142" fullinertia="0.000177123 0.000277208 0.000213043 3.53074e-06 2.85249e-05 -2.73083e-06"/>
+          <joint axis="0 0 1" name="left_yoke__hip" type="hinge" range="-0.69813170079773 0.3316125578789244"/>
+          <inertial pos="0.0434863 0.00417704 0.0207139" mass="0.243657" fullinertia="0.000176751 0.000276896 0.000212579 3.57228e-06 2.8634e-05 -2.73023e-06"/>
           <!-- Part left_hip_back -->
-          <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_back" material="left_hip_back_material"/>
-          <geom type="mesh" class="collision" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_back" material="left_hip_back_material"/>
+          <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_back" material="left_hip_back_material"/>
+          <geom type="mesh" class="collision" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_back" material="left_hip_back_material"/>
           <!-- Part left_hip_servo -->
-          <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_servo" material="left_hip_servo_material"/>
-          <geom type="mesh" class="collision" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_servo" material="left_hip_servo_material"/>
+          <geom type="mesh" class="visual" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_servo" material="left_hip_servo_material"/>
+          <geom type="mesh" class="collision" pos="-0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_servo" material="left_hip_servo_material"/>
           <!-- Part left_yoke_servo_horn -->
-          <geom type="mesh" class="visual" pos="-0.071 0.02105 0.0301" quat="0.707107 0.707107 0 0" mesh="left_yoke_servo_horn" material="left_yoke_servo_horn_material"/>
-          <geom type="mesh" class="collision" pos="-0.071 0.02105 0.0301" quat="0.707107 0.707107 0 0" mesh="left_yoke_servo_horn" material="left_yoke_servo_horn_material"/>
+          <geom type="mesh" class="visual" pos="-0.071 0.02105 0.0301" quat="0.707107 0.707107 0 -0" mesh="left_yoke_servo_horn" material="left_yoke_servo_horn_material"/>
+          <geom type="mesh" class="collision" pos="-0.071 0.02105 0.0301" quat="0.707107 0.707107 0 -0" mesh="left_yoke_servo_horn" material="left_yoke_servo_horn_material"/>
           <!-- Part left_hip_r_sense -->
-          <geom type="mesh" class="visual" pos="-0.0732 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_r_sense" material="left_hip_r_sense_material"/>
-          <geom type="mesh" class="collision" pos="-0.0732 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_r_sense" material="left_hip_r_sense_material"/>
+          <geom type="mesh" class="visual" pos="-0.0722 0.02105 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_r_sense" material="left_hip_r_sense_material"/>
+          <geom type="mesh" class="collision" pos="-0.0722 0.02105 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_r_sense" material="left_hip_r_sense_material"/>
           <!-- Part left_hip_front -->
-          <geom type="mesh" class="visual" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_front" material="left_hip_front_material"/>
-          <geom type="mesh" class="collision" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="left_hip_front" material="left_hip_front_material"/>
+          <geom type="mesh" class="visual" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_front" material="left_hip_front_material"/>
+          <geom type="mesh" class="collision" pos="-0.071 0.02105 0.0304" quat="0.707107 0.707107 0 -0" mesh="left_hip_front" material="left_hip_front_material"/>
           <!-- Link left_upper_leg -->
-          <body name="left_upper_leg" pos="0.0755 -0.00365213 0.0301319" quat="0.707107 0 -0.707107 0">
+          <body name="left_upper_leg" pos="0.0755 -0.00365213 0.0301319" quat="0.707107 0 -0.707107 -0">
             <!-- Joint from left_hip_back to left_upper_leg -->
-            <joint axis="0 0 1" name="left_hip__upper_leg" type="hinge" range="-1.570796326794894 2.6645352591003757e-15"/>
-            <inertial pos="9.07047e-05 0.0783286 0.00249172" mass="0.300656" fullinertia="0.000697604 0.000131222 0.000627475 1.13571e-06 7.08175e-07 -0.000123513"/>
+            <joint axis="0 0 1" name="left_hip__upper_leg" type="hinge" range="-1.5707963267948921 4.440892098500626e-15"/>
+            <inertial pos="9.02068e-05 0.0782933 0.00251966" mass="0.300155" fullinertia="0.000695559 0.000131044 0.000625592 1.11835e-06 7.08851e-07 -0.000123921"/>
             <!-- Part left_upper_leg_r_sense -->
-            <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1471" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_r_sense" material="left_upper_leg_r_sense_material"/>
-            <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1471" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_r_sense" material="left_upper_leg_r_sense_material"/>
+            <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1476" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_r_sense" material="left_upper_leg_r_sense_material"/>
+            <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1476" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg_r_sense" material="left_upper_leg_r_sense_material"/>
             <!-- Part left_upper_leg -->
             <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1468" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg" material="left_upper_leg_material"/>
             <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1468" quat="0.5 0.5 0.5 -0.5" mesh="left_upper_leg" material="left_upper_leg_material"/>
@@ -122,10 +122,10 @@
             <geom type="mesh" class="visual" pos="0.000268125 0.025 0.1465" quat="0.5 0.5 0.5 -0.5" mesh="left_hip_servo_horn" material="left_hip_servo_horn_material"/>
             <geom type="mesh" class="collision" pos="0.000268125 0.025 0.1465" quat="0.5 0.5 0.5 -0.5" mesh="left_hip_servo_horn" material="left_hip_servo_horn_material"/>
             <!-- Link left_lower_leg -->
-            <body name="left_lower_leg" pos="-0 0.14 -0.0021" quat="1 -0 -0 0">
+            <body name="left_lower_leg" pos="0 0.14 -0.0021" quat="1 -0 -0 -0">
               <!-- Joint from left_upper_leg to left_lower_leg -->
-              <joint axis="0 0 1" name="left_upper_leg__lower_leg" type="hinge" range="-0.17453292519943028 2.1816615649929147"/>
-              <inertial pos="-0.00168275 0.0891721 0.00607216" mass="0.178037" fullinertia="0.000423686 3.65436e-05 0.000414376 4.79199e-06 -5.48309e-07 -4.23468e-05"/>
+              <joint axis="0 0 1" name="left_upper_leg__lower_leg" type="hinge" range="-0.17453292519943206 2.181661564992913"/>
+              <inertial pos="-0.00150033 0.0846327 0.00581041" mass="0.183721" fullinertia="0.000503681 3.69807e-05 0.000494006 5.24054e-06 -3.90634e-07 -4.84047e-05"/>
               <!-- Part left_lower_leg_servo -->
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_servo" material="left_lower_leg_servo_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_servo" material="left_lower_leg_servo_material"/>
@@ -136,25 +136,25 @@
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg" material="left_lower_leg_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg" material="left_lower_leg_material"/>
               <!-- Part left_lower_leg_c_sense_1 -->
-              <geom type="mesh" class="visual" pos="0.000468125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_1" material="left_lower_leg_c_sense_1_material"/>
-              <geom type="mesh" class="collision" pos="0.000468125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_1" material="left_lower_leg_c_sense_1_material"/>
+              <geom type="mesh" class="visual" pos="0.000968125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_1" material="left_lower_leg_c_sense_1_material"/>
+              <geom type="mesh" class="collision" pos="0.000968125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_1" material="left_lower_leg_c_sense_1_material"/>
               <!-- Part left_lower_leg_c_sense_2 -->
-              <geom type="mesh" class="visual" pos="0.000468125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_2" material="left_lower_leg_c_sense_2_material"/>
-              <geom type="mesh" class="collision" pos="0.000468125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_2" material="left_lower_leg_c_sense_2_material"/>
+              <geom type="mesh" class="visual" pos="0.000968125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_2" material="left_lower_leg_c_sense_2_material"/>
+              <geom type="mesh" class="collision" pos="0.000968125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_c_sense_2" material="left_lower_leg_c_sense_2_material"/>
               <!-- Part left_lower_leg_r_sense -->
               <geom type="mesh" class="visual" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_r_sense" material="left_lower_leg_r_sense_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 -0.115 0.1492" quat="0.5 0.5 0.5 -0.5" mesh="left_lower_leg_r_sense" material="left_lower_leg_r_sense_material"/>
               <!-- Link left_foot_base -->
-              <body name="left_foot_base" pos="0 0.14 0.0426" quat="0 -1 0 -0">
+              <body name="left_foot_base" pos="-0 0.14 0.0426" quat="0 -1 0 -0">
                 <!-- Joint from left_lower_leg to left_foot_base -->
-                <joint axis="0 0 1" name="left_lower_leg__foot" type="hinge" range="-1.3962634015954618 1.3962634015954654"/>
-                <inertial pos="1.06014e-05 -0.0376658 0.0307087" mass="0.200741" fullinertia="0.00011921 0.000235692 0.000191353 -1.5942e-08 -7.09e-10 1.1683e-06"/>
+                <joint axis="0 0 1" name="left_lower_leg__foot" type="hinge" range="-1.396263401595453 1.3962634015954742"/>
+                <inertial pos="1.25698e-05 -0.0368179 0.0309956" mass="0.184808" fullinertia="0.000114312 0.000223924 0.000180591 -2.246e-08 5.529e-09 1.38678e-06"/>
                 <!-- Part left_foot_limit_switch_1 -->
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material"/>
                 <!-- Part left_foot_base -->
-                <geom type="mesh" class="visual" pos="0.000268105 0.257213 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material"/>
-                <geom type="mesh" class="collision" pos="0.000268105 0.257213 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material"/>
+                <geom type="mesh" class="visual" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material"/>
+                <geom type="mesh" class="collision" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material"/>
                 <!-- Part left_foot_right_side -->
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material"/>
@@ -168,9 +168,9 @@
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material"/>
                 <!-- Frame forward_left_c_sense -->
-                <site group="3" name="forward_left_c_sense" pos="-0.026 -0.0560558 0.035448" quat="0.509769 0.490037 -0.490037 0.509769"/>
+                <site group="3" name="forward_left_c_sense" pos="-0.026 -0.0551653 0.0310006" quat="0.5 0.5 -0.5 0.5"/>
                 <!-- Frame back_left_c_sense -->
-                <site group="3" name="back_left_c_sense" pos="0.026 -0.0560558 0.035448" quat="0.509769 0.490037 -0.490037 0.509769"/>
+                <site group="3" name="back_left_c_sense" pos="0.026 -0.0551653 0.0310006" quat="0.5 0.5 -0.5 0.5"/>
               </body>
             </body>
           </body>
@@ -180,7 +180,7 @@
       <body name="right_yoke_lower_frame" pos="-0.0257327 -0.0419394 0.0535752" quat="1 -0 -0 -0">
         <!-- Joint from head_base to right_yoke_lower_frame -->
         <joint axis="0 0 1" name="head__right_yoke" type="hinge" range="-0.6108652381980153 0.6108652381980153"/>
-        <inertial pos="0.000323008 0.000784846 -0.0141845" mass="0.112882" fullinertia="2.9437e-05 3.44404e-05 4.67194e-05 -5.83351e-07 -1.42593e-07 8.2936e-08"/>
+        <inertial pos="0.000324896 0.00109651 -0.01422" mass="0.111396" fullinertia="2.85697e-05 3.34805e-05 4.50044e-05 -5.72187e-07 -1.39545e-07 1.20774e-07"/>
         <!-- Part head_servo_horn_right -->
         <geom type="mesh" class="visual" pos="0.061 0 -0.03605" quat="1 0 0 0" mesh="head_servo_horn_right" material="head_servo_horn_right_material"/>
         <geom type="mesh" class="collision" pos="0.061 0 -0.03605" quat="1 0 0 0" mesh="head_servo_horn_right" material="head_servo_horn_right_material"/>
@@ -200,7 +200,7 @@
         <body name="right_hip_back" pos="-0.01 -0.03005 -0.0147" quat="0.707107 -0.707107 -0 0">
           <!-- Joint from right_yoke_lower_frame to right_hip_back -->
           <joint axis="0 0 1" name="right_yoke__hip" type="hinge" range="-0.33161255787892263 0.6981317007977318"/>
-          <inertial pos="-0.043463 0.0041791 0.0206854" mass="0.244142" fullinertia="0.000177123 0.000277208 0.000213043 -3.53074e-06 -2.85249e-05 -2.73083e-06"/>
+          <inertial pos="-0.0434863 0.00417704 0.0207139" mass="0.243657" fullinertia="0.000176751 0.000276896 0.000212579 -3.57228e-06 -2.8634e-05 -2.73023e-06"/>
           <!-- Part right_yoke_servo_horn -->
           <geom type="mesh" class="visual" pos="0.071 0.02105 0.0301" quat="0.707107 0.707107 0 -0" mesh="right_yoke_servo_horn" material="right_yoke_servo_horn_material"/>
           <geom type="mesh" class="collision" pos="0.071 0.02105 0.0301" quat="0.707107 0.707107 0 -0" mesh="right_yoke_servo_horn" material="right_yoke_servo_horn_material"/>
@@ -211,8 +211,8 @@
           <geom type="mesh" class="visual" pos="0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="right_hip_back" material="right_hip_back_material"/>
           <geom type="mesh" class="collision" pos="0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="right_hip_back" material="right_hip_back_material"/>
           <!-- Part right_hip_r_sense -->
-          <geom type="mesh" class="visual" pos="0.0732 0.02105 0.0304" quat="0.707107 0.707107 -0 0" mesh="right_hip_r_sense" material="right_hip_r_sense_material"/>
-          <geom type="mesh" class="collision" pos="0.0732 0.02105 0.0304" quat="0.707107 0.707107 -0 0" mesh="right_hip_r_sense" material="right_hip_r_sense_material"/>
+          <geom type="mesh" class="visual" pos="0.0722 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="right_hip_r_sense" material="right_hip_r_sense_material"/>
+          <geom type="mesh" class="collision" pos="0.0722 0.02105 0.0304" quat="0.707107 0.707107 0 0" mesh="right_hip_r_sense" material="right_hip_r_sense_material"/>
           <!-- Part right_hip_servo -->
           <geom type="mesh" class="visual" pos="0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="right_hip_servo" material="right_hip_servo_material"/>
           <geom type="mesh" class="collision" pos="0.071 0.0213479 0.0304" quat="0.707107 0.707107 0 -0" mesh="right_hip_servo" material="right_hip_servo_material"/>
@@ -220,7 +220,7 @@
           <body name="right_upper_leg" pos="-0.0755 -0.00365213 0.0301319" quat="0 -0.707107 0 -0.707107">
             <!-- Joint from right_hip_back to right_upper_leg -->
             <joint axis="0 0 1" name="right_hip__upper_leg" type="hinge" range="0.0 1.5707963267948966"/>
-            <inertial pos="9.07047e-05 -0.0783286 0.00249172" mass="0.300656" fullinertia="0.000697604 0.000131222 0.000627475 -1.13572e-06 7.08175e-07 0.000123513"/>
+            <inertial pos="9.02069e-05 -0.0782933 0.00251966" mass="0.300155" fullinertia="0.000695559 0.000131044 0.000625592 -1.11835e-06 7.08851e-07 0.000123921"/>
             <!-- Part right_hip_servo_horn -->
             <geom type="mesh" class="visual" pos="0.000268125 -0.025 0.1465" quat="0.5 -0.5 -0.5 -0.5" mesh="right_hip_servo_horn" material="right_hip_servo_horn_material"/>
             <geom type="mesh" class="collision" pos="0.000268125 -0.025 0.1465" quat="0.5 -0.5 -0.5 -0.5" mesh="right_hip_servo_horn" material="right_hip_servo_horn_material"/>
@@ -231,19 +231,19 @@
             <geom type="mesh" class="visual" pos="0.000268125 -0.025 0.1468" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg" material="right_upper_leg_material"/>
             <geom type="mesh" class="collision" pos="0.000268125 -0.025 0.1468" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg" material="right_upper_leg_material"/>
             <!-- Part right_upper_leg_r_sense -->
-            <geom type="mesh" class="visual" pos="0.000268125 -0.025 0.1471" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg_r_sense" material="right_upper_leg_r_sense_material"/>
-            <geom type="mesh" class="collision" pos="0.000268125 -0.025 0.1471" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg_r_sense" material="right_upper_leg_r_sense_material"/>
+            <geom type="mesh" class="visual" pos="0.000268125 -0.025 0.1476" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg_r_sense" material="right_upper_leg_r_sense_material"/>
+            <geom type="mesh" class="collision" pos="0.000268125 -0.025 0.1476" quat="0.5 -0.5 -0.5 -0.5" mesh="right_upper_leg_r_sense" material="right_upper_leg_r_sense_material"/>
             <!-- Link right_lower_leg -->
             <body name="right_lower_leg" pos="-0 -0.14 -0.0021" quat="1 -0 0 -0">
               <!-- Joint from right_upper_leg to right_lower_leg -->
-              <joint axis="0 0 1" name="right_upper_leg__lower_leg" type="hinge" range="-2.181661564992911 0.17453292519943384"/>
-              <inertial pos="-0.00168275 -0.0891721 0.00607216" mass="0.178037" fullinertia="0.000423686 3.65436e-05 0.000414376 -4.792e-06 -5.48308e-07 4.23468e-05"/>
+              <joint axis="0 0 1" name="right_upper_leg__lower_leg" type="hinge" range="-2.181661564992912 0.17453292519943295"/>
+              <inertial pos="-0.00150033 -0.0846327 0.00581041" mass="0.183721" fullinertia="0.000503681 3.69807e-05 0.000494006 -5.24056e-06 -3.90634e-07 4.84047e-05"/>
               <!-- Part right_lower_leg_r_sense -->
               <geom type="mesh" class="visual" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_r_sense" material="right_lower_leg_r_sense_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_r_sense" material="right_lower_leg_r_sense_material"/>
               <!-- Part right_lower_leg_c_sense_2 -->
-              <geom type="mesh" class="visual" pos="0.000468125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_2" material="right_lower_leg_c_sense_2_material"/>
-              <geom type="mesh" class="collision" pos="0.000468125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_2" material="right_lower_leg_c_sense_2_material"/>
+              <geom type="mesh" class="visual" pos="0.000968125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_2" material="right_lower_leg_c_sense_2_material"/>
+              <geom type="mesh" class="collision" pos="0.000968125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_2" material="right_lower_leg_c_sense_2_material"/>
               <!-- Part right_lower_leg -->
               <geom type="mesh" class="visual" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg" material="right_lower_leg_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg" material="right_lower_leg_material"/>
@@ -254,13 +254,13 @@
               <geom type="mesh" class="visual" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_servo" material="right_lower_leg_servo_material"/>
               <geom type="mesh" class="collision" pos="0.000268125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_servo" material="right_lower_leg_servo_material"/>
               <!-- Part right_lower_leg_c_sense_1 -->
-              <geom type="mesh" class="visual" pos="0.000468125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_1" material="right_lower_leg_c_sense_1_material"/>
-              <geom type="mesh" class="collision" pos="0.000468125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_1" material="right_lower_leg_c_sense_1_material"/>
+              <geom type="mesh" class="visual" pos="0.000968125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_1" material="right_lower_leg_c_sense_1_material"/>
+              <geom type="mesh" class="collision" pos="0.000968125 0.115 0.1492" quat="0.5 -0.5 -0.5 -0.5" mesh="right_lower_leg_c_sense_1" material="right_lower_leg_c_sense_1_material"/>
               <!-- Link right_foot_base -->
               <body name="right_foot_base" pos="0 -0.14 0.0426" quat="0 1 0 -0">
                 <!-- Joint from right_lower_leg to right_foot_base -->
-                <joint axis="0 0 1" name="right_lower_leg__foot" type="hinge" range="-1.3962634015954627 1.3962634015954645"/>
-                <inertial pos="1.06051e-05 0.0376658 0.0305889" mass="0.200741" fullinertia="0.000119229 0.000235711 0.000191353 1.5899e-08 -8.24e-10 -8.92358e-07"/>
+                <joint axis="0 0 1" name="right_lower_leg__foot" type="hinge" range="-1.3962634015954636 1.3962634015954636"/>
+                <inertial pos="1.25758e-05 0.036818 0.0308985" mass="0.184808" fullinertia="0.000114318 0.00022393 0.000180591 2.2414e-08 5.457e-09 -1.1554e-06"/>
                 <!-- Part right_lower_leg_servo_horn -->
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1066" quat="0.5 0.5 0.5 -0.5" mesh="right_lower_leg_servo_horn" material="right_lower_leg_servo_horn_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1066" quat="0.5 0.5 0.5 -0.5" mesh="right_lower_leg_servo_horn" material="right_lower_leg_servo_horn_material"/>
@@ -274,15 +274,15 @@
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_2" material="right_foot_limit_switch_2_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_2" material="right_foot_limit_switch_2_material"/>
                 <!-- Part right_foot_base -->
-                <geom type="mesh" class="visual" pos="0.000268113 -0.257213 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material"/>
-                <geom type="mesh" class="collision" pos="0.000268113 -0.257213 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material"/>
+                <geom type="mesh" class="visual" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material"/>
+                <geom type="mesh" class="collision" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material"/>
                 <!-- Part right_foot_limit_switch_1 -->
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_1" material="right_foot_limit_switch_1_material"/>
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_1" material="right_foot_limit_switch_1_material"/>
                 <!-- Frame forward_right_c_sense -->
-                <site group="3" name="forward_right_c_sense" pos="-0.026 0.0560558 0.0350468" quat="0.509769 -0.490037 0.490037 0.509769"/>
+                <site group="3" name="forward_right_c_sense" pos="-0.026 0.0551653 0.0305994" quat="0.5 -0.5 0.5 0.5"/>
                 <!-- Frame back_right_c_sense -->
-                <site group="3" name="back_right_c_sense" pos="0.026 0.0560558 0.0350468" quat="0.509769 -0.490037 0.490037 0.509769"/>
+                <site group="3" name="back_right_c_sense" pos="0.026 0.0551653 0.0305994" quat="0.5 -0.5 0.5 0.5"/>
               </body>
             </body>
           </body>
@@ -291,73 +291,73 @@
     </body>
   </worldbody>
   <asset>
-    <mesh file="right_foot_left_side.stl"/>
-    <mesh file="head_r_sense_right.stl"/>
-    <mesh file="head_voltmeter.stl"/>
-    <mesh file="left_yoke_upper_frame.stl"/>
-    <mesh file="right_upper_leg_servo_horn.stl"/>
-    <mesh file="right_foot_limit_switch_1.stl"/>
-    <mesh file="right_lower_leg_c_sense_1.stl"/>
-    <mesh file="left_foot_limit_switch_1.stl"/>
-    <mesh file="head_servo_horn_left.stl"/>
-    <mesh file="right_foot_limit_switch_2.stl"/>
-    <mesh file="head_button.stl"/>
-    <mesh file="head_base.stl"/>
-    <mesh file="head_midframe.stl"/>
-    <mesh file="head_servo_left.stl"/>
+    <mesh file="left_yoke_servo.stl"/>
+    <mesh file="right_hip_front.stl"/>
     <mesh file="right_yoke_servo_horn.stl"/>
     <mesh file="left_lower_leg_c_sense_1.stl"/>
-    <mesh file="right_lower_leg_c_sense_2.stl"/>
-    <mesh file="right_foot_right_side.stl"/>
-    <mesh file="right_upper_leg_servo.stl"/>
-    <mesh file="left_upper_leg.stl"/>
-    <mesh file="left_yoke_servo.stl"/>
-    <mesh file="right_lower_leg.stl"/>
-    <mesh file="left_foot_left_side.stl"/>
-    <mesh file="head_battery.stl"/>
-    <mesh file="left_yoke_r_sense.stl"/>
-    <mesh file="left_upper_leg_r_sense.stl"/>
-    <mesh file="right_lower_leg_servo.stl"/>
-    <mesh file="right_yoke_servo.stl"/>
-    <mesh file="right_hip_front.stl"/>
-    <mesh file="left_upper_leg_servo_horn.stl"/>
-    <mesh file="left_yoke_servo_horn.stl"/>
-    <mesh file="left_lower_leg_r_sense.stl"/>
-    <mesh file="head_powerboard.stl"/>
-    <mesh file="left_yoke_lower_frame.stl"/>
-    <mesh file="left_foot_base.stl"/>
-    <mesh file="head_servo_horn_right.stl"/>
-    <mesh file="head_fan.stl"/>
-    <mesh file="right_hip_r_sense.stl"/>
-    <mesh file="right_hip_servo.stl"/>
-    <mesh file="right_lower_leg_r_sense.stl"/>
-    <mesh file="head_r_pi.stl"/>
-    <mesh file="right_foot_base.stl"/>
-    <mesh file="left_lower_leg_servo.stl"/>
-    <mesh file="right_yoke_upper_frame.stl"/>
-    <mesh file="right_lower_leg_servo_horn.stl"/>
-    <mesh file="left_hip_r_sense.stl"/>
-    <mesh file="right_yoke_r_sense.stl"/>
-    <mesh file="right_upper_leg_r_sense.stl"/>
-    <mesh file="head_r_sense_left.stl"/>
-    <mesh file="head_top.stl"/>
-    <mesh file="right_upper_leg.stl"/>
     <mesh file="left_lower_leg_c_sense_2.stl"/>
-    <mesh file="right_hip_servo_horn.stl"/>
-    <mesh file="left_hip_servo_horn.stl"/>
-    <mesh file="right_hip_back.stl"/>
-    <mesh file="head_servo_right.stl"/>
-    <mesh file="head_lid.stl"/>
-    <mesh file="head_main.stl"/>
-    <mesh file="left_hip_front.stl"/>
-    <mesh file="left_foot_right_side.stl"/>
-    <mesh file="right_yoke_lower_frame.stl"/>
-    <mesh file="left_foot_limit_switch_2.stl"/>
-    <mesh file="left_lower_leg.stl"/>
-    <mesh file="left_hip_servo.stl"/>
+    <mesh file="left_yoke_r_sense.stl"/>
     <mesh file="left_lower_leg_servo_horn.stl"/>
     <mesh file="left_upper_leg_servo.stl"/>
+    <mesh file="right_lower_leg_servo.stl"/>
+    <mesh file="head_r_sense_left.stl"/>
+    <mesh file="right_foot_limit_switch_2.stl"/>
+    <mesh file="right_yoke_r_sense.stl"/>
+    <mesh file="left_upper_leg_servo_horn.stl"/>
+    <mesh file="head_r_sense_right.stl"/>
+    <mesh file="head_r_pi.stl"/>
+    <mesh file="left_hip_servo_horn.stl"/>
+    <mesh file="head_lid.stl"/>
+    <mesh file="head_servo_right.stl"/>
+    <mesh file="left_lower_leg_servo.stl"/>
+    <mesh file="head_voltmeter.stl"/>
+    <mesh file="left_lower_leg_r_sense.stl"/>
+    <mesh file="head_button.stl"/>
+    <mesh file="left_foot_base.stl"/>
+    <mesh file="right_upper_leg.stl"/>
+    <mesh file="left_foot_limit_switch_1.stl"/>
+    <mesh file="head_base.stl"/>
+    <mesh file="right_hip_back.stl"/>
+    <mesh file="head_battery.stl"/>
+    <mesh file="right_upper_leg_r_sense.stl"/>
+    <mesh file="right_hip_servo.stl"/>
+    <mesh file="head_fan.stl"/>
+    <mesh file="left_yoke_upper_frame.stl"/>
     <mesh file="left_hip_back.stl"/>
+    <mesh file="right_foot_left_side.stl"/>
+    <mesh file="left_yoke_servo_horn.stl"/>
+    <mesh file="left_hip_front.stl"/>
+    <mesh file="left_upper_leg.stl"/>
+    <mesh file="right_upper_leg_servo.stl"/>
+    <mesh file="head_midframe.stl"/>
+    <mesh file="left_upper_leg_r_sense.stl"/>
+    <mesh file="right_lower_leg_c_sense_1.stl"/>
+    <mesh file="right_hip_servo_horn.stl"/>
+    <mesh file="right_upper_leg_servo_horn.stl"/>
+    <mesh file="head_main.stl"/>
+    <mesh file="right_foot_limit_switch_1.stl"/>
+    <mesh file="right_yoke_servo.stl"/>
+    <mesh file="left_foot_right_side.stl"/>
+    <mesh file="right_lower_leg.stl"/>
+    <mesh file="head_top.stl"/>
+    <mesh file="head_servo_horn_left.stl"/>
+    <mesh file="left_hip_r_sense.stl"/>
+    <mesh file="right_lower_leg_servo_horn.stl"/>
+    <mesh file="left_lower_leg.stl"/>
+    <mesh file="left_foot_limit_switch_2.stl"/>
+    <mesh file="right_hip_r_sense.stl"/>
+    <mesh file="head_servo_left.stl"/>
+    <mesh file="left_yoke_lower_frame.stl"/>
+    <mesh file="right_yoke_lower_frame.stl"/>
+    <mesh file="right_yoke_upper_frame.stl"/>
+    <mesh file="right_lower_leg_r_sense.stl"/>
+    <mesh file="right_foot_right_side.stl"/>
+    <mesh file="right_foot_base.stl"/>
+    <mesh file="right_lower_leg_c_sense_2.stl"/>
+    <mesh file="left_foot_left_side.stl"/>
+    <mesh file="left_hip_servo.stl"/>
+    <mesh file="head_servo_horn_right.stl"/>
+    <mesh file="head_powerboard.stl"/>
     <material name="head_servo_left_material" rgba="0.647059 0.647059 0.647059 1"/>
     <material name="head_servo_right_material" rgba="0.647059 0.647059 0.647059 1"/>
     <material name="head_battery_material" rgba="0.87451 0.447059 0.317647 1"/>

@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "ab89b2c373e4ff9b58749bb8",
-    "documentMicroversion": "df50bfd19724fdddfc23a504",
+    "documentMicroversion": "09c0f34b64d8c8190785928d",
     "elementId": "5341ae56fe52d71542c50c49",
     "fullConfiguration": "default",
     "id": "MF7/PxohhCjvAOhpq",
     "isStandardContent": false,
     "name": "head_fan <1>",
-    "partId": "RJDD",
+    "partId": "RSDD",
     "suppressed": false,
     "type": "Part"
 }

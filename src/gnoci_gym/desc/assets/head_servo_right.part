@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "ab89b2c373e4ff9b58749bb8",
-    "documentMicroversion": "df50bfd19724fdddfc23a504",
+    "documentMicroversion": "09c0f34b64d8c8190785928d",
     "elementId": "5341ae56fe52d71542c50c49",
     "fullConfiguration": "default",
     "id": "M5LadkBa07Q3JqGAu",
     "isStandardContent": false,
     "name": "head_servo_right <1>",
-    "partId": "RSOD",
+    "partId": "RUPD",
     "suppressed": false,
     "type": "Part"
 }
