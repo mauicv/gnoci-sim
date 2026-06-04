@@ -32,6 +32,6 @@
         <light pos="0 0 3.5" dir="0 0 -0.1" directional="true" />
         <camera name="track" mode="trackcom" pos="-0.5 -0.5 0.35"
             xyaxes="0.7071 -0.7071 0 0.4082 0.4082 0.8165"/>
-        <geom name="floor" size="0 0 0.05" pos="0 0 -0.20" type="plane" material="groundplane" friction="1.0 0.005 0.0001"/>
+        <geom name="floor" size="0 0 0.05" pos="0 0 -0.23" type="plane" material="groundplane" friction="1.0 0.005 0.0001"/>
     </worldbody>
 </mujoco>

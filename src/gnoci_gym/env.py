@@ -7,7 +7,7 @@ from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
 
-_STANDING_HEIGHT = 0.185
+_STANDING_HEIGHT = 0.23
 
 _JOINT_NAMES = [
     'head__left_yoke',
