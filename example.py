@@ -66,7 +66,7 @@ for i in tqdm(range(100)):
     rewards.append(reward)
     frames.append(env.render())
 
-plt.plot(times, root_heights)
+plt.plot(times, rewards)
 # plt.plot(times, root_uprights)
 # plt.plot(times, rewards)
 # plt.plot(times, dones)
