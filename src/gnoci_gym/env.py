@@ -97,7 +97,7 @@ class GnociGymEnv(gym.Env):
     DEFAULT_REWARD_COEFS = {
         'stand':        1.0,
         'velocity':     2.5,
-        'foot_contact': 0.5,
+        'foot_contact': 0.75,
         'foot_airtime': 0.5,
         'orientation':  0.1,
         'heading':      0.3,
