@@ -6,6 +6,7 @@ from collections import deque
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
+from .config import CONTROL_HZ
 
 _STANDING_HEIGHT = 0.23
 
@@ -96,18 +97,18 @@ class GnociGymEnv(gym.Env):
     DEFAULT_REWARD_COEFS = {
         'stand':        1.0,
         'velocity':     2.5,
-        'foot_contact': 0.0,
+        'foot_contact': 0.5,
         'foot_airtime': 0.5,
-        'orientation':  1.0,
+        'orientation':  0.1,
         'heading':      0.3,
-        'yoke_joint':   1.0,
+        'yoke_joint':   0.1,
     }
 
     def __init__(
             self,
             camera='track',
             render_mode='rgb_array',
-            control_hz=80,
+            control_hz=CONTROL_HZ,
             max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
@@ -354,7 +355,7 @@ class GnociGymEnv(gym.Env):
             if not in_contact:
                 self._foot_airtime[i] += dt
             elif not was_contact:  # touchdown
-                reward += self._foot_airtime[i] - 0.12
+                reward += self._foot_airtime[i] - 0.075
                 self._foot_airtime[i] = 0.0
         self._foot_was_contact = current
         return reward
@@ -425,7 +426,8 @@ class GnociGymEnv(gym.Env):
             heading_reward      = self._get_heading_reward()
             yoke_joint_reward   = self._get_yoke_joint_reward()
             return (
-                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
+                c['stand']        * stand_reward
+                + c['velocity']   * velocity_reward
                 + c['foot_contact'] * foot_contact_reward
                 + c['foot_airtime'] * foot_airtime_reward
                 + c['orientation']  * orientation_reward

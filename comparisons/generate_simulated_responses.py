@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gnoci_gym import GnociGymEnv
+from gnoci_gym.config import CONTROL_HZ
 import numpy as np
 import mujoco
 import imageio.v2 as imageio
@@ -30,7 +31,6 @@ _JOINT_NAMES = [
 ]
 
 N_STEPS = 100
-CONTROL_HZ = 40
 RENDER_W, RENDER_H = 640, 480
 RENDER_FPS = 30
 
