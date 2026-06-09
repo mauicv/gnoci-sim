@@ -58,7 +58,7 @@ for action_val in [-1.0, 1.0]:
             max_action_delay=0,
             action_filter_alpha=0.4,
             control_hz=CONTROL_HZ,
-            max_joint_vel=3,
+            max_joint_vel=6,
             fix_root_body=True,
         )
         env.reset(seed=0)
