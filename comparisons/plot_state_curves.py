@@ -19,7 +19,7 @@ STATE_LABELS = (
   + ["fwd L\ncontact", "bck L\ncontact", "fwd R\ncontact", "bck R\ncontact"]
   + ["gyro x", "gyro y", "gyro z"]
   + ["acc x",  "acc y",  "acc z"]
-  + ["pitch", "roll"]
+  + ["roll", "pitch"] # NOTE: swapped for real data
 )
 
 with open("comparisons/real_state_data.json") as f:
@@ -70,6 +70,12 @@ for i in range(N_STATES):
             linestyle="--", zorder=2)
 
     ax.set_title(STATE_LABELS[i], pad=4)
+    if i < 20:
+        ax.set_ylim(-1, 1)
+    elif 24 <= i <= 26:
+        ax.set_ylim(-1.5, 1.5)
+    elif 27 <= i <= 29:
+        ax.set_ylim(-2, 2)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(3))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(3))
     ax.tick_params(length=2)

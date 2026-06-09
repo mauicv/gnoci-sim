@@ -7,6 +7,7 @@ from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
 from .filters import ComplementaryFilter, EMAFilter
 from .config import CONTROL_HZ
+import math
 
 _STANDING_HEIGHT = 0.23
 
@@ -54,10 +55,12 @@ _DEFAULT_JOINT_POS_ARRAY = np.array(
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
-MAX_JOINT_VEL = 3.0    # max joint angular velocity (rad/s) — scales action deltas
-IMU_GYRO_SCALE = 10.0  # rad/s — clips to [-1, 1] at this angular velocity
-IMU_ACC_SCALE  = 19.62 # m/s² (2g) — clips to [-1, 1] at 2g
+MAX_JOINT_VEL = 10.0    # max joint angular velocity (rad/s) — scales action deltas
 
+IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
+IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
+
+# NOTE: Not sure why this is half above?
 
 test_cfg = dict(
     initial_randomness=0.0,
@@ -249,7 +252,7 @@ class GnociGymEnv(gym.Env):
 
     def _sync_action_filters(self):
         for i, f in enumerate(self.action_filters):
-            f.value = float(self.data.ctrl[i])
+            f.value = 0.0
 
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
@@ -301,14 +304,14 @@ class GnociGymEnv(gym.Env):
     def _get_obs(self):
         gyro, acc = self._get_imu_data()
         joint_pos = self._get_joint_positions() / np.pi - _DEFAULT_JOINT_POS_ARRAY
-        joint_vel = self._get_joint_velocities() / np.pi
+        joint_vel = self._get_joint_velocities()
         obs = np.array([
             *joint_pos,
             *joint_vel,
             *self._get_contact_forces(),
-            *(gyro / IMU_GYRO_SCALE),
-            *(acc / IMU_ACC_SCALE),
-            *self._get_pitch_and_roll(gyro, acc),
+            *gyro,
+            *acc,
+            *self._get_pitch_and_roll(gyro * 250, acc),
         ])
         if self.obs_noise_scale > 0:
             noisey_obs = obs + np.random.normal(0, self.obs_noise_scale, obs.shape)
@@ -331,10 +334,18 @@ class GnociGymEnv(gym.Env):
         _, _, z = self.data.xpos[self.body_id]
         return z - self.floor_z
 
+    def permute_imu_data(self, data):
+        x, y, z = data[0], data[1], data[2]
+        return [y, x, -z]
+
     def _get_imu_data(self):
         gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
         acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
-        return gyro, acc
+        gyro = [r * IMU_GYRO_SCALE for r in gyro]
+        acc = [a / IMU_ACC_SCALE for a in acc]
+        gyro = self.permute_imu_data(gyro)
+        acc = self.permute_imu_data(acc)
+        return np.array(gyro), np.array(acc)
 
     def _get_pitch_and_roll(self, gyro, acc):
         self.comp_filter.update(acc, gyro, dt=1.0 / self.control_hz)
@@ -438,7 +449,9 @@ class GnociGymEnv(gym.Env):
         return c['stand'] * stand_reward
 
     def step(self, action):
-        action = action.clip(-1, 1)
+        # not sure why but this matches the real robot better
+        action = np.tanh(2*action.clip(-1, 1))
+        # action = action.clip(-1, 1)
 
         if self.max_action_delay > 0:
             self._action_buffer.append(action.copy())

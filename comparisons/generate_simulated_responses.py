@@ -18,16 +18,16 @@ import json
 from tqdm import tqdm
 
 _JOINT_NAMES = [
-    'head__left_yoke',
-    'left_yoke__hip',
+    # 'head__left_yoke',
+    # 'left_yoke__hip',
     'left_hip__upper_leg',
-    'left_upper_leg__lower_leg',
-    'left_lower_leg__foot',
-    'head__right_yoke',
-    'right_yoke__hip',
-    'right_hip__upper_leg',
-    'right_upper_leg__lower_leg',
-    'right_lower_leg__foot',
+    # 'left_upper_leg__lower_leg',
+    # 'left_lower_leg__foot',
+    # 'head__right_yoke',
+    # 'right_yoke__hip',
+    # 'right_hip__upper_leg',
+    # 'right_upper_leg__lower_leg',
+    # 'right_lower_leg__foot',
 ]
 
 N_STEPS = 100
@@ -39,10 +39,12 @@ os.makedirs(rendered_dir, exist_ok=True)
 
 results = []
 frames = []
-pbar = tqdm(total=len(_JOINT_NAMES) * 2, desc='Generating responses')
+action_opts = [-1, -0.25, -0.1, -0.05, 0.05, 0.1, 0.25, 1]
+pbar = tqdm(total=len(_JOINT_NAMES) * len(action_opts), desc='Generating responses')
 
-for action_val in [-1.0, 1.0]:
+for action_val in action_opts:
     for joint_idx, joint_name in enumerate(_JOINT_NAMES):
+        joint_idx = 2
         env = GnociGymEnv(
             initial_randomness=0.0,
             inertial_mass_range=(0.0, 0.0),
@@ -58,7 +60,7 @@ for action_val in [-1.0, 1.0]:
             max_action_delay=0,
             action_filter_alpha=0.4,
             control_hz=CONTROL_HZ,
-            max_joint_vel=6,
+            max_joint_vel=10,
             fix_root_body=True,
         )
         env.reset(seed=0)
@@ -84,14 +86,14 @@ for action_val in [-1.0, 1.0]:
 
         results.append({
             "joint_name": joint_name,
-            "action": int(action_val),
+            "action": action_val,
             "angular_pos": angular_pos,
             "angular_vel": angular_vel,
             "time": times,
         })
 
 
-        pbar.set_postfix(joint=joint_name, action=f'{action_val:+.0f}')
+        pbar.set_postfix(joint=joint_name, action=f'{action_val:+.2f}')
         pbar.update(1)
 
 video_path = os.path.join(rendered_dir, f"response_render.mp4")
