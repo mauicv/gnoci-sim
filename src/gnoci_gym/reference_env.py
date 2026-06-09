@@ -100,7 +100,7 @@ class ReferenceEnv:
             self.comp_filter.update(acc, gyro, dt=PHYSICS_DT)
 
             joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[i] for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
-            joint_vel = self.data.qvel[self.joint_dof_addrs] / np.pi
+            joint_vel = self.data.qvel[self.joint_dof_addrs]
 
             dataset[i] = np.array([
                 *joint_pos,
