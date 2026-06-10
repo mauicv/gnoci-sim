@@ -241,6 +241,11 @@ class GnociGymEnv(gym.Env):
         self._foot_airtime = [0.0, 0.0]
         self._foot_was_contact = [False, False]
 
+        # Add at the end:
+        if hasattr(self, '_renderer') and self._renderer is not None:
+            self._renderer.close()
+        self._renderer = mujoco.Renderer(self.model)
+
     def _set_joint_positions(self, joint_positions):
         for jnt_name, pos in joint_positions.items():
             if pos is None:
@@ -482,8 +487,11 @@ class GnociGymEnv(gym.Env):
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':
-            with mujoco.Renderer(self.model) as renderer:
-                renderer.update_scene(self.data, camera=self.camera)
-                return renderer.render()
-        else:
-            raise ValueError(f"Invalid render mode: {mode}")
+            self._renderer.update_scene(self.data, camera=self.camera)
+            return self._renderer.render()
+        raise ValueError(f"Invalid render mode: {mode}")
+
+    def close(self):
+    if hasattr(self, '_renderer') and self._renderer is not None:
+        self._renderer.close()
+        self._renderer = None
