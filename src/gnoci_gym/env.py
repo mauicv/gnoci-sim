@@ -492,6 +492,6 @@ class GnociGymEnv(gym.Env):
         raise ValueError(f"Invalid render mode: {mode}")
 
     def close(self):
-    if hasattr(self, '_renderer') and self._renderer is not None:
-        self._renderer.close()
-        self._renderer = None
+        if hasattr(self, '_renderer') and self._renderer is not None:
+            self._renderer.close()
+            self._renderer = None
