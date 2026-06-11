@@ -209,9 +209,13 @@ class GnociGymEnv(gym.Env):
         except KeyError:
             self.floor_geom_id = -1
             self.floor_z = 0.0
-        geom_start = self.model.body_geomadr[self.body_id]
-        geom_count = self.model.body_geomnum[self.body_id]
-        self.root_geom_ids = set(range(geom_start, geom_start + geom_count))
+        _ground_term_bodies = ["head_base", "left_hip_back", "right_hip_back"]
+        self._ground_termination_geoms = set()
+        for bname in _ground_term_bodies:
+            bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, bname)
+            gs = self.model.body_geomadr[bid]
+            gc = self.model.body_geomnum[bid]
+            self._ground_termination_geoms.update(range(gs, gs + gc))
         self.joint_qpos_addrs = [
             self.model.jnt_qposadr[self.model.joint(j).id]
             for j in _JOINT_NAMES
@@ -338,8 +342,8 @@ class GnociGymEnv(gym.Env):
             return False
         for i in range(self.data.ncon):
             c = self.data.contact[i]
-            if (c.geom1 == self.floor_geom_id and c.geom2 in self.root_geom_ids) or \
-               (c.geom2 == self.floor_geom_id and c.geom1 in self.root_geom_ids):
+            if (c.geom1 == self.floor_geom_id and c.geom2 in self._ground_termination_geoms) or \
+               (c.geom2 == self.floor_geom_id and c.geom1 in self._ground_termination_geoms):
                 return True
         return False
 
