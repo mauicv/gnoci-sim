@@ -209,6 +209,9 @@ class GnociGymEnv(gym.Env):
         except KeyError:
             self.floor_geom_id = -1
             self.floor_z = 0.0
+        geom_start = self.model.body_geomadr[self.body_id]
+        geom_count = self.model.body_geomnum[self.body_id]
+        self.root_geom_ids = set(range(geom_start, geom_start + geom_count))
         self.joint_qpos_addrs = [
             self.model.jnt_qposadr[self.model.joint(j).id]
             for j in _JOINT_NAMES
@@ -329,6 +332,16 @@ class GnociGymEnv(gym.Env):
 
     def overturned(self):
         return self._get_root_upright() < 0.3
+
+    def _root_body_on_ground(self):
+        if self.floor_geom_id == -1:
+            return False
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            if (c.geom1 == self.floor_geom_id and c.geom2 in self.root_geom_ids) or \
+               (c.geom2 == self.floor_geom_id and c.geom1 in self.root_geom_ids):
+                return True
+        return False
 
     def _get_root_upright(self):
         xmat = self.data.xmat[self.body_id]
@@ -481,7 +494,7 @@ class GnociGymEnv(gym.Env):
             mujoco.mj_step(self.model, self.data)
         state, noisey_state = self._get_obs()
         reward = self._get_reward()
-        if self.overturned():
+        if self.overturned() or self._root_body_on_ground():
             self.done = True
         return (noisey_state, reward, self.done, self.done, {'state': state})
 
