@@ -130,7 +130,9 @@ class GnociGymEnv(gym.Env):
             task='stand',
             reward_coefs=None,
             fix_root_body=False,
+            apply_tanh2_action_map=False,
         ):
+        self.apply_tanh2_action_map = apply_tanh2_action_map
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
@@ -472,8 +474,10 @@ class GnociGymEnv(gym.Env):
 
     def step(self, action):
         # not sure why but this matches the real robot better
-        action = np.tanh(2*action.clip(-1, 1))
-        # action = action.clip(-1, 1)
+        if self.apply_tanh2_action_map:
+            action = np.tanh(2*action)
+        else:
+            action = action.clip(-1, 1)
 
         if self.max_action_delay > 0:
             self._action_buffer.append(action.copy())
