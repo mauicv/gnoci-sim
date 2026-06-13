@@ -130,7 +130,7 @@ class GnociGymEnv(gym.Env):
             task='stand',
             reward_coefs=None,
             fix_root_body=False,
-            apply_tanh2_action_map=False,
+            apply_tanh2_action_map=True,
         ):
         self.apply_tanh2_action_map = apply_tanh2_action_map
         self.camera = camera
@@ -461,8 +461,7 @@ class GnociGymEnv(gym.Env):
             heading_reward      = self._get_heading_reward()
             yoke_joint_reward   = self._get_yoke_joint_reward()
             return (
-                c['stand']        * stand_reward
-                + c['velocity']   * velocity_reward
+                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
                 + c['foot_contact'] * foot_contact_reward
                 + c['foot_airtime'] * foot_airtime_reward
                 + c['orientation']  * orientation_reward
@@ -500,7 +499,7 @@ class GnociGymEnv(gym.Env):
             self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
-        state, noisey_state = self._get_obs()
+        noisey_state, state = self._get_obs()
         reward = self._get_reward()
         if self.overturned() or self._root_body_on_ground():
             self.done = True

@@ -121,7 +121,9 @@ class ReferenceEnv:
             stacked = np.zeros((n_ref, _OBS_DIM * self.frame_stack), dtype=np.float32)
             for i in range(n_ref):
                 for k in range(self.frame_stack):
-                    idx = (i - k) % n_ref
+                    # Match gym.wrappers.FrameStackObservation ordering: oldest
+                    # frame first, newest frame last.
+                    idx = (i - (self.frame_stack - 1 - k)) % n_ref
                     stacked[i, k * _OBS_DIM:(k + 1) * _OBS_DIM] = dataset[idx]
             dataset = stacked
 
