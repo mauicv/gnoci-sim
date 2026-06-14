@@ -115,13 +115,15 @@ class GnociGymEnv(gym.Env):
     metadata = {'render_modes': ['rgb_array']}
 
     DEFAULT_REWARD_COEFS = {
-        'stand':        1.0,
-        'velocity':     2.5,
-        'foot_contact': 0.75,
-        'foot_airtime': 0.5,
-        'orientation':  0.1,
-        'heading':      0.3,
-        'yoke_joint':   0.1,
+        'stand':         1.0,
+        'velocity':      2.5,
+        'foot_contact':  0.75,
+        'foot_airtime':  0.5,
+        'foot_clearance': 0.5,
+        'fall':          0.5,
+        'orientation':   0.1,
+        'heading':       0.3,
+        'yoke_joint':    0.1,
     }
 
     def __init__(
@@ -148,7 +150,20 @@ class GnociGymEnv(gym.Env):
             reward_coefs=None,
             fix_root_body=False,
             apply_tanh2_action_map=True,
+            survival_bonus=0.2,
+            target_velocity=0.1,
+            target_velocity_band=0.1,
+            foot_clearance_height=0.02,
         ):
+        # Curriculum-controlled knobs. These are plain attributes so an external
+        # trainer can ramp them between phases (e.g. SB3 env_method/set_attr) via
+        # set_curriculum(). Defaults give a small standing floor + slow target
+        # that the trainer is expected to anneal: survival_bonus -> 0 and
+        # target_velocity upward.
+        self.survival_bonus = float(survival_bonus)
+        self.target_velocity = float(target_velocity)
+        self.target_velocity_band = float(target_velocity_band)
+        self.foot_clearance_height = float(foot_clearance_height)
         self.apply_tanh2_action_map = apply_tanh2_action_map
         self.camera = camera
         self.render_mode = render_mode
@@ -222,6 +237,12 @@ class GnociGymEnv(gym.Env):
         self.body_id = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_BODY, "head_base"
         )
+        self.left_foot_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "left_foot_base"
+        )
+        self.right_foot_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "right_foot_base"
+        )
         try:
             self.floor_geom_id = self.model.geom("floor").id
             self.floor_z = self.model.geom_pos[self.floor_geom_id][2]
@@ -294,6 +315,29 @@ class GnociGymEnv(gym.Env):
             self.data.qpos[adr] += np.clip(np.random.normal(0, randomness), range_min, range_max)
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
+
+    def set_curriculum(
+            self,
+            *,
+            survival_bonus=None,
+            target_velocity=None,
+            target_velocity_band=None,
+            foot_clearance_height=None,
+    ):
+        """Update curriculum knobs mid-training.
+
+        Intended to be driven by the trainer (e.g. via SB3 ``env_method``) to
+        anneal the standing floor and exploration noise away while ramping the
+        forward-speed target up. Only provided values are changed.
+        """
+        if survival_bonus is not None:
+            self.survival_bonus = max(0.0, float(survival_bonus))
+        if target_velocity is not None:
+            self.target_velocity = max(0.0, float(target_velocity))
+        if target_velocity_band is not None:
+            self.target_velocity_band = max(0.0, float(target_velocity_band))
+        if foot_clearance_height is not None:
+            self.foot_clearance_height = max(0.0, float(foot_clearance_height))
 
     def _sample_push_interval(self):
         lo = int(self.push_interval_range[0] * self.control_hz)
@@ -413,7 +457,11 @@ class GnociGymEnv(gym.Env):
         self._foot_was_contact = current
         return reward
 
-    def _get_stand_reward(self):
+    def _get_stand_gate(self):
+        """Posture quality in [0, 1]: 1 when upright at standing height, decaying
+        as the robot tips or sinks. Used as a multiplicative gate on the shaped
+        locomotion reward (and, inverted, as the fall penalty) rather than as a
+        standalone reward term, so it provides no standing reward floor."""
         upright = self._get_root_upright()
         height  = self._get_root_height()
         standing = tolerance(
@@ -428,8 +476,36 @@ class GnociGymEnv(gym.Env):
         velocity = self._get_velocity()
         side_v = abs(velocity[0])
         lateral_penalty = max(1.0 - 2.0 * side_v, 0.0)
-        forward_reward = tolerance(-velocity[1], bounds=(0.4, 0.6), margin=0.4)
+        forward = -velocity[1]  # rewarded direction is -Y world
+        target = self.target_velocity
+        if forward <= 0.0 or target <= 0.0:
+            # Exactly zero at (or below) zero forward speed — no deadband leak,
+            # so standing still earns nothing from velocity.
+            forward_reward = 0.0
+        elif forward < target:
+            # Linear ramp from 0 at v=0 to 1 at the (curriculum) target speed.
+            forward_reward = forward / target
+        else:
+            # At/above target: full credit within the band, fading beyond it.
+            forward_reward = tolerance(
+                forward,
+                bounds=(target, target + self.target_velocity_band),
+                margin=target,
+            )
         return forward_reward * lateral_penalty
+
+    def _get_foot_clearance_reward(self):
+        """Reward committing to a step: credit the height difference between the
+        feet so one foot must clearly leave the ground. Exactly 0 when both feet
+        are at the same height (e.g. planted), ramping to 1 once the swing foot
+        is ``2 * foot_clearance_height`` above the stance foot."""
+        threshold = self.foot_clearance_height
+        if threshold <= 0.0:
+            return 0.0
+        lz = self.data.xpos[self.left_foot_body_id][2]
+        rz = self.data.xpos[self.right_foot_body_id][2]
+        clearance = abs(lz - rz)
+        return float(np.clip((clearance - threshold) / threshold, 0.0, 1.0))
 
     def _get_orientation_reward(self):
         pitch = float(self.comp_filter.pitch)
@@ -469,25 +545,42 @@ class GnociGymEnv(gym.Env):
 
     def _get_reward(self):
         c = self.reward_coefs
-        stand_reward = self._get_stand_reward()
+        stand_gate = self._get_stand_gate()
 
         if self.task == 'walk':
-            velocity_reward     = self._get_velocity_reward()
-            foot_contact_reward = self._get_foot_contact_reward()
-            foot_airtime_reward = self._get_foot_airtime_reward()
-            orientation_reward  = self._get_orientation_reward()
-            heading_reward      = self._get_heading_reward()
-            yoke_joint_reward   = self._get_yoke_joint_reward()
+            velocity_reward      = self._get_velocity_reward()
+            foot_contact_reward  = self._get_foot_contact_reward()
+            foot_airtime_reward  = self._get_foot_airtime_reward()
+            foot_clearance_reward = self._get_foot_clearance_reward()
+            orientation_reward   = self._get_orientation_reward()
+            heading_reward       = self._get_heading_reward()
+            yoke_joint_reward    = self._get_yoke_joint_reward()
+
+            # Motion-only locomotion terms. velocity/airtime/clearance are ~0
+            # while still; foot_contact only pays on single-foot support.
+            locomotion = (
+                c['velocity']       * velocity_reward
+                + c['foot_contact']  * foot_contact_reward
+                + c['foot_airtime']  * foot_airtime_reward
+                + c['foot_clearance'] * foot_clearance_reward
+            )
+            # Posture shaping, gated by forward motion so a motionless-but-tidy
+            # robot earns ~0 from it (no alternate standing floor).
+            posture = velocity_reward * (
+                c['orientation'] * orientation_reward
+                + c['heading']   * heading_reward
+                + c['yoke_joint'] * yoke_joint_reward
+            )
+            # The shaped reward is gated by posture quality (so falling throttles
+            # it toward 0). The only thing payable while still is the decaying
+            # survival_bonus; falling is penalised rather than rewarded.
             return (
-                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
-                + c['foot_contact'] * foot_contact_reward
-                + c['foot_airtime'] * foot_airtime_reward
-                + c['orientation']  * orientation_reward
-                + c['heading']      * heading_reward
-                + c['yoke_joint']   * yoke_joint_reward
+                stand_gate * (locomotion + posture)
+                + self.survival_bonus
+                - c['fall'] * (1.0 - stand_gate)
             )
 
-        return c['stand'] * stand_reward
+        return c['stand'] * stand_gate
 
     def step(self, action):
         # not sure why but this matches the real robot better
