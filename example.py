@@ -20,13 +20,8 @@ import sys
 # env = GnociGymEnv(**kwargs)
 
 env = GnociGymEnv(
-    # initial_randomness=0.0,
-    # inertial_mass_range=(0.00, 0.00),
-    # inertial_mass_noise=0.00,
-    # floor_tilt_range=0.0,
-    action_filter_alpha=1,
-    control_hz=40,
-    max_joint_vel=3,
+    action_filter_alpha=0.4,
+    control_hz=50,
 )
 
 state, *_ = env.reset(seed=0)
@@ -51,12 +46,12 @@ for i in tqdm(range(100)):
     # action = np.random.uniform(-1, 1, env.action_space.shape[0])
     # action = np.random.randn(env.action_space.shape[0], 1) * 1
     action = np.zeros(env.action_space.shape[0])
-    action[2] = 1
-    action[5+2] = 1
-    action[4] = 1
-    action[9] = 1
-    action[3] = 1
-    action[8] = 1
+    # action[2] = 1
+    # action[5+2] = 1
+    # action[4] = 1
+    # action[9] = 1
+    # action[3] = 1
+    # action[8] = 1
 
     # action = np.zeros(env.action_space.shape[0])
     # action = np.ones(env.action_space.shape[0])

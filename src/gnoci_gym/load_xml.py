@@ -17,8 +17,8 @@ def _expand_includes(root, desc_dir):
 
 def _load_and_perturb_basic_xml(
         filename,
-        inertial_mass_range=(0.04, 0.06),
-        inertial_mass_noise=0.03,
+        inertial_mass_range=(0.0, 0.0),
+        inertial_mass_noise=0.0,
         floor_tilt_range=0.0,
         floor_friction_range=(1.0, 1.0),
         fix_root_body=False,

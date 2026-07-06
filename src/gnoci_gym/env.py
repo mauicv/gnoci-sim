@@ -1,13 +1,12 @@
 import mujoco
 import gymnasium as gym
 import numpy as np
-import os
 from collections import deque
 from .utils import tolerance
 from .load_xml import _load_and_perturb_basic_xml
-from .filters import ComplementaryFilter, EMAFilter
-from .config import CONTROL_HZ
-import math
+from .filters import ComplementaryFilter
+from .servo import Servo
+from .config import CONTROL_HZ, FREQ
 
 _STANDING_HEIGHT = 0.23
 
@@ -55,12 +54,9 @@ _DEFAULT_JOINT_POS_ARRAY = np.array(
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
-MAX_JOINT_VEL = 10.0    # max joint angular velocity (rad/s) — scales action deltas
 
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
-
-# NOTE: Not sure why this is half above?
 
 # Per-dimension observation normalisation divisors. Each value is the ~99th
 # percentile of |obs| measured from random-action rollouts, chosen so every
@@ -129,10 +125,9 @@ class GnociGymEnv(gym.Env):
             camera='track',
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
-            max_joint_vel=MAX_JOINT_VEL,
-            initial_randomness=0.1,
-            inertial_mass_range=(0.04, 0.06),
-            inertial_mass_noise=0.03,
+            initial_randomness=0.0,
+            inertial_mass_range=(0.00, 0.00),
+            inertial_mass_noise=0.00,
             floor_tilt_range=0.0,
             floor_friction_range=(1.0, 1.0),
             joint_friction_range=(0.1, 0.1),
@@ -157,7 +152,10 @@ class GnociGymEnv(gym.Env):
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
-        self.action_scale = max_joint_vel / control_hz
+        # Advance the servo controllers at the hardware rate (FREQ, e.g. 100Hz)
+        # while physics steps at 1/PHYSICS_DT (e.g. 500Hz): one servo update every
+        # `servo_update_every` substeps, matching the real 100Hz servo loop.
+        self.servo_update_every = max(1, int(round(1.0 / (FREQ * PHYSICS_DT))))
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
@@ -261,7 +259,7 @@ class GnociGymEnv(gym.Env):
             self.model.opt.gravity[2] += np.random.normal(0, self.gravity_noise)
 
         self.comp_filter = ComplementaryFilter()
-        self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        self._build_servos()
         grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
         self._contact_buffer = deque([False] * grace_steps, maxlen=grace_steps)
         self._foot_airtime = [0.0, 0.0]
@@ -281,9 +279,37 @@ class GnociGymEnv(gym.Env):
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
+    def _build_servos(self):
+        # One controller per joint, mirroring the real hardware servo model.
+        # The servo works in normalised units (value in [-1, 1] -> PWM range),
+        # which maps to MuJoCo joint radians via `* np.pi`. Joint limits are
+        # converted from radians (jnt_range) into that normalised space.
+        self.servos = []
+        for i, name in enumerate(_JOINT_NAMES):
+            lo, hi = self.joint_ranges[i]
+            servo = Servo(
+                name=name,
+                pin_limits=(lo / np.pi, hi / np.pi),
+                init_value=float(_DEFAULT_JOINT_POS_ARRAY[i]),
+            )
+            # We advance the PID once per `servo_update_every` substeps, so the
+            # simple_pid wall-clock rate gate must be disabled — sim time is not
+            # real time. With Ki=Kd=0 the controller is a pure slew-rate limiter.
+            servo.pid_controller.sample_time = None
+            self.servos.append(servo)
+        self._sync_action_filters()
+
     def _sync_action_filters(self):
-        for i, f in enumerate(self.action_filters):
-            f.value = 0.0
+        # Align each servo's internal state to the current joint position so the
+        # command starts from where the robot actually is (no step-0 jump).
+        for i, servo in enumerate(self.servos):
+            val = float(self.data.qpos[self.joint_qpos_addrs[i]] / np.pi)
+            servo._value = val
+            servo.pid_controller.reset()
+            servo.pid_controller.sample_time = None
+            servo.pid_controller.setpoint = val
+            servo.low_pass_filter.reset()
+            self.data.ctrl[i] = servo.value * np.pi
 
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
@@ -511,11 +537,17 @@ class GnociGymEnv(gym.Env):
                 self._push_step = 0
                 self._push_interval = self._sample_push_interval()
 
+        # Set the 50Hz setpoint from the policy action (servo internally scales
+        # by action_scale and low-pass filters the delta, as on hardware).
         for i in range(self.model.nu):
-            delta = self.action_filters[i].update(action[i]) * self.action_scale
-            lo, hi = self.joint_ranges[i]
-            self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
-        for _ in range(self.n_substeps):
+            self.servos[i].update_setpoint_delta(action[i])
+        # Step physics, advancing the slew-limited servo command toward the
+        # setpoint at the hardware rate (every `servo_update_every` substeps).
+        for k in range(self.n_substeps):
+            if k % self.servo_update_every == 0:
+                for i in range(self.model.nu):
+                    self.servos[i].get_pwm()  # advances the PID/slew state
+                    self.data.ctrl[i] = self.servos[i].value * np.pi
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward = self._get_reward()
