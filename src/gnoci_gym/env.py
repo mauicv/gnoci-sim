@@ -156,6 +156,9 @@ class GnociGymEnv(gym.Env):
         # while physics steps at 1/PHYSICS_DT (e.g. 500Hz): one servo update every
         # `servo_update_every` substeps, matching the real 100Hz servo loop.
         self.servo_update_every = max(1, int(round(1.0 / (FREQ * PHYSICS_DT))))
+        # Simulated time between servo updates — passed to the PID so its dt is
+        # sim time (not wall-clock), keeping it correct for nonzero Ki/Kd.
+        self.servo_dt = self.servo_update_every * PHYSICS_DT
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
@@ -546,7 +549,7 @@ class GnociGymEnv(gym.Env):
         for k in range(self.n_substeps):
             if k % self.servo_update_every == 0:
                 for i in range(self.model.nu):
-                    self.servos[i].get_pwm()  # advances the PID/slew state
+                    self.servos[i].get_pwm(dt=self.servo_dt)  # advances the PID/slew state
                     self.data.ctrl[i] = self.servos[i].value * np.pi
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()

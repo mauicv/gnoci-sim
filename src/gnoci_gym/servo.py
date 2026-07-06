@@ -66,8 +66,11 @@ class Servo:
         elif pwm_val < SERVO_PWM_THRESHOLD_MIN: pwm_val = SERVO_PWM_THRESHOLD_MIN
         return pwm_val
 
-    def get_pwm(self):
-        self._update_value = self.pid_controller(self._value)
+    def get_pwm(self, dt=None):
+        # dt=None -> simple_pid uses wall-clock time (real hardware). In sim,
+        # pass the simulated timestep so the PID is time-correct and
+        # deterministic regardless of gains or CPU speed.
+        self._update_value = self.pid_controller(self._value, dt=dt)
         self._value += self._update_value
         return self._value_to_pwm()
 
