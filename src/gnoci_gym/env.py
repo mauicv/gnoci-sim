@@ -23,19 +23,6 @@ _JOINT_NAMES = [
     'right_lower_leg__foot',
 ]
 
-_DEFAULT_JOINT_POSITIONS: dict[str, float] = {
-    'head__left_yoke': 0,
-    'left_yoke__hip': 0,
-    'left_hip__upper_leg': 0.3 * 0.75,
-    'left_upper_leg__lower_leg': -0.6 * 0.75,
-    'left_lower_leg__foot': -0.3 * 0.75,
-    'head__right_yoke': 0,
-    'right_yoke__hip': 0,
-    'right_hip__upper_leg': 0.3 * 0.75,
-    'right_upper_leg__lower_leg': -0.6 * 0.75,
-    'right_lower_leg__foot': -0.3 * 0.75
-}
-
 _TOUCH_SENSOR_NAMES = [
     "forward_left_c_sense-touch",
     "back_left_c_sense-touch",
@@ -45,12 +32,6 @@ _TOUCH_SENSOR_NAMES = [
 
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
-
-_DEFAULT_JOINT_POS_ARRAY = np.array(
-    [_DEFAULT_JOINT_POSITIONS[j] if _DEFAULT_JOINT_POSITIONS[j] is not None else 0.0
-     for j in _JOINT_NAMES],
-    dtype=np.float32,
-)
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
@@ -183,7 +164,7 @@ class GnociGymEnv(gym.Env):
             -1, 1, shape=(_N_JOINTS,), dtype=np.float32
         )
         self.initialize_model()
-        self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
+        self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
@@ -271,14 +252,19 @@ class GnociGymEnv(gym.Env):
             self._renderer.close()
         self._renderer = mujoco.Renderer(self.model)
 
-    def _set_joint_positions(self, joint_positions):
-        for jnt_name, pos in joint_positions.items():
-            if pos is None:
-                continue
+    def _set_joint_positions(self):
+        for jnt_name in _JOINT_NAMES:
             qpos_addr = self.model.jnt_qposadr[self.model.joint(jnt_name).id]
-            self.data.qpos[qpos_addr] = pos * np.pi
+            self.data.qpos[qpos_addr] = 0.0
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
+            # The general actuators use dyntype="filter": each has an internal
+            # activation (data.act) that low-passes ctrl and drives the force.
+            # mj_resetData zeros it, so seed it to the target too — else the
+            # servo lags (tau=1s) and the joint sags toward zero for ~a second.
+            adr = self.model.actuator_actadr[i]
+            if adr >= 0:
+                self.data.act[adr] = self.data.ctrl[i]
 
     def _build_servos(self):
         # One controller per joint, mirroring the real hardware servo model.
@@ -291,7 +277,7 @@ class GnociGymEnv(gym.Env):
             servo = Servo(
                 name=name,
                 pin_limits=(lo / np.pi, hi / np.pi),
-                init_value=float(_DEFAULT_JOINT_POS_ARRAY[i]),
+                init_value=0.0,
             )
             # We advance the PID once per `servo_update_every` substeps, so the
             # simple_pid wall-clock rate gate must be disabled — sim time is not
@@ -330,7 +316,7 @@ class GnociGymEnv(gym.Env):
     def reset(self, seed=None, **kwargs):
         self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
-        self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
+        self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
@@ -361,7 +347,7 @@ class GnociGymEnv(gym.Env):
 
     def _get_obs(self):
         gyro, acc = self._get_imu_data()
-        joint_pos = self._get_joint_positions() / np.pi - _DEFAULT_JOINT_POS_ARRAY
+        joint_pos = self._get_joint_positions() / np.pi
         joint_vel = self._get_joint_velocities()
         obs = np.array([
             *joint_pos,

@@ -49,9 +49,10 @@ def get_config():
         "servo_dt": env.servo_dt,                           # servo dt
         "physics_dt": env.model.opt.timestep,               # physics dt
         "n_substeps": env.n_substeps,                       # n_substeps per action set
-        "action_hz": 1.0 / (env.model.opt.timestep * env.n_substeps),
         "joint_limits": [jr.tolist() for jr in env.joint_ranges],
         "action_dim": ACTION_DIM,
+        "action_hz": 1.0 / (env.model.opt.timestep * env.n_substeps),
+        "hardware_hz": 1.0 / (env.model.opt.timestep * env.servo_update_every),
     }
 
     print('control hz:', 1.0 / (config['physics_dt'] * config['n_substeps']), 'Hz')

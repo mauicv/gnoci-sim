@@ -213,12 +213,26 @@ def process(src, dst):
         child.attrib['meshdir'] = str(os.path.join('src', 'gnoci_gym', 'desc', 'assets'))
 
     # ── actuator class ───────────────────────────────────────────────────────
+    # onshape-to-robot emits <position> actuators. Convert them to <general>
+    # so the ACTUATOR_CLASS defaults (dyntype/gaintype/biastype) actually
+    # apply — a <position> actuator only inherits <position> class defaults,
+    # never the <general> ones defined for miuzei_25kg.
+    # inheritrange/kp/dampratio are <position> shortcuts that <general> does
+    # not accept; drop them and set an explicit ctrlrange straight from
+    # _JOINT_LIMITS (the same limits table used for the joints).
     actuator_el = root.find("actuator")
     if actuator_el is not None:
         for actuator in actuator_el:
+            actuator.tag = "general"
             actuator.set("class", ACTUATOR_CLASS)
-            actuator.attrib["inheritrange"] = "1"
-            actuator.attrib.pop("ctrlrange", None)
+            for attr in ("inheritrange", "kp", "dampratio", "ctrlrange"):
+                actuator.attrib.pop(attr, None)
+            name = actuator.get("joint")
+            if name in _JOINT_LIMITS:
+                lo_rel, hi_rel = _JOINT_LIMITS[name]
+                lo = lo_rel * math.pi
+                hi = hi_rel * math.pi
+                actuator.set("ctrlrange", f"{lo:.10f} {hi:.10f}")
 
     # ── flip left-side joint axes and ranges ─────────────────────────────────
     for joint in root.iter("joint"):
@@ -231,9 +245,12 @@ def process(src, dst):
             lo, hi = map(float, rng.split())
             joint.set("range", f"{-hi} {-lo}")
 
-    # ── set joint ranges ─────────────────────────────────────────────────────
+    # ── set joint ranges and reference (default) positions ───────────────────
     # Range = (default + relative_offset) * π, applied after axis flip so the
     # absolute qpos bounds are consistent for both left and right joints.
+    # ref = default * π sets qpos0, so mj_resetData starts in the default pose.
+    # (ref only shifts qpos0; it does not offset actuator length, so the servo
+    # equilibrium ctrl = qpos is unaffected.)
     for joint in root.iter("joint"):
         name = joint.get("name")
         if name not in _JOINT_LIMITS:
@@ -243,6 +260,7 @@ def process(src, dst):
         lo = (default + lo_rel) * math.pi
         hi = (default + hi_rel) * math.pi
         joint.set("range", f"{lo:.10f} {hi:.10f}")
+        joint.set("ref", f"{-default * math.pi:.10f}")
 
     # ── strip collision geoms for cosmetic / sensor parts ────────────────────
     removed = 0

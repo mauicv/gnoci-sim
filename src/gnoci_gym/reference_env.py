@@ -10,7 +10,6 @@ from .env import (
     IMU_ACC_SCALE,
     _JOINT_NAMES,
     _TOUCH_SENSOR_NAMES,
-    _DEFAULT_JOINT_POS_ARRAY,
     _OBS_NORM,
 )
 from .filters import ComplementaryFilter
@@ -99,7 +98,7 @@ class ReferenceEnv:
             acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
             self.comp_filter.update(acc, gyro, dt=PHYSICS_DT)
 
-            joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[i] for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
+            joint_pos = [jp/np.pi for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
             joint_vel = self.data.qvel[self.joint_dof_addrs]
 
             dataset[i] = np.array([
