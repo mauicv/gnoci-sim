@@ -10,6 +10,8 @@
                 gainprm="500"
                 biastype="affine"
                 biasprm="0 -500 -40"
+                forcerange="-2.70 2.70"
+                forcelimited="true"
             />
         </default>
     </default>

@@ -129,11 +129,16 @@ if __name__ == '__main__':
     history = []
 
     for epoch in range(n_epochs):
-        q0 = jnp.array(batch['initial_states'])
-        qd0 = jnp.array(batch['initial_velocities'])
-        actions = jnp.array(batch['actions'])
+        # Dataset positions/velocities/actions are in the robot's normalised
+        # units (angle / π); MJX qpos/qvel/ctrl are in radians (rad/s). Scale by
+        # π. NB: actions_mjx are normalised too despite the name (e.g. 0.675 ==
+        # the 2.12 rad joint limit), so they need it as well. motor_idxs are
+        # indices — leave unscaled.
+        q0 = jnp.array(batch['initial_states']) * jnp.pi
+        qd0 = jnp.array(batch['initial_velocities']) * jnp.pi
+        actions = jnp.array(batch['actions']) * jnp.pi
         motor_idxs = jnp.array(batch['motor_idxs'])
-        q_targ = jnp.array(batch['states'])
+        q_targ = jnp.array(batch['states']) * jnp.pi
 
         time_start = time.perf_counter()
 
