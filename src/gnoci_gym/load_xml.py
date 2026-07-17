@@ -22,6 +22,7 @@ def _load_and_perturb_basic_xml(
         floor_tilt_range=0.0,
         floor_friction_range=(1.0, 1.0),
         fix_root_body=False,
+        strip_contact_sensors=False,
     ):
     package_dir = os.path.dirname(os.path.abspath(__file__))
     desc_dir    = os.path.join(package_dir, 'desc')
@@ -71,5 +72,12 @@ def _load_and_perturb_basic_xml(
             if geom.get("name") == "floor":
                 geom.set("quat", f"{w} {x} {y} {z}")
                 break
+
+    if strip_contact_sensors:
+        sensor_elem = xml_root.find("sensor")
+        if sensor_elem is not None:
+            for child in list(sensor_elem):  # list() to avoid mutating while iterating
+                if child.tag in ("touch", "force"):
+                    sensor_elem.remove(child)
 
     return ET.tostring(xml_root, encoding='utf8')

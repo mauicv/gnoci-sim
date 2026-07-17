@@ -2,7 +2,6 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-import torch
 
 from .config import CONTROL_HZ
 from .env import (
@@ -11,7 +10,6 @@ from .env import (
     IMU_ACC_SCALE,
     _JOINT_NAMES,
     _TOUCH_SENSOR_NAMES,
-    _DEFAULT_JOINT_POS_ARRAY,
     _OBS_NORM,
 )
 from .filters import ComplementaryFilter
@@ -100,7 +98,7 @@ class ReferenceEnv:
             acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
             self.comp_filter.update(acc, gyro, dt=PHYSICS_DT)
 
-            joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[i] for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
+            joint_pos = [jp/np.pi for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
             joint_vel = self.data.qvel[self.joint_dof_addrs]
 
             dataset[i] = np.array([
@@ -137,16 +135,16 @@ class ReferenceEnv:
     def sample_pairs(
         self,
         batch_size: int,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
 
         Returns:
-            Tuple of (s_i, s_next), each of shape (batch_size, *obs_shape).
+            Tuple of (s_i, s_next), each an np.ndarray of shape (batch_size, *obs_shape).
         """
         n_ref = len(self._dataset)
-        inds = torch.randint(0, n_ref, (batch_size,))
-        s_i = torch.from_numpy(self._dataset[inds])
-        s_next = torch.from_numpy(self._dataset[(inds + 1) % n_ref])
+        inds = np.random.randint(0, n_ref, size=batch_size)
+        s_i = self._dataset[inds]
+        s_next = self._dataset[(inds + 1) % n_ref]
         return s_i, s_next
 
     def get_reference(self) -> np.ndarray:
