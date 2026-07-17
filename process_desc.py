@@ -143,6 +143,11 @@ PART_MASSES: dict[str, float] = {
     "right_foot_right_side": 0.037,
 }
 
+JOINT_ATTRS = {
+    "damping": 0.20748324285704314,
+    "frictionloss": 0.008398011061633381,
+    "armature": 0.01698398900680475
+}
 
 def _indent(elem, level=0):
     """Add pretty-print indentation in-place (Python < 3.9 compat)."""
@@ -262,6 +267,17 @@ def process(src, dst):
         joint.set("range", f"{lo:.10f} {hi:.10f}")
         joint.set("ref", f"{-default * math.pi:.10f}")
 
+    # ── set joint dynamics attributes (damping/frictionloss/armature) ────────
+    joints_tuned = 0
+    for joint in root.iter("joint"):
+        if joint.get("type", "hinge") == "free":
+            continue
+        if not joint.get("name"):
+            continue
+        for attr, value in JOINT_ATTRS.items():
+            joint.set(attr, str(value))
+        joints_tuned += 1
+
     # ── strip collision geoms for cosmetic / sensor parts ────────────────────
     removed = 0
     for body in root.iter("body"):
@@ -302,6 +318,7 @@ def process(src, dst):
 
     print(f"Written: {dst}")
     print(f"  Joints ({len(joints_instrumented)}): {', '.join(joints_instrumented)}")
+    print(f"  Joints tuned (damping/frictionloss/armature): {joints_tuned}")
     print(f"  Collision geoms removed: {removed}")
     print(f"  Geom masses assigned:   {masses_set}")
     print(f"  Touch sensors added:    {len(c_sense_sites)} ({', '.join(c_sense_sites)})")

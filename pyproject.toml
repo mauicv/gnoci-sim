@@ -23,4 +23,4 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools.package-data]
-gnoci_gym = ["desc/*.xml", "desc/assets/*", "reference/xml/*.xml", "sysid/dataset/*.json"]
+gnoci_gym = ["desc/*.xml", "desc/assets/*", "reference/xml/*.xml"]

@@ -5,12 +5,12 @@
         <default class="miuzei_25kg">
             <general
                 dyntype="filter"
-                dynprm="0.1"
+                dynprm="0.016292180996752285"
                 gaintype="fixed"
-                gainprm="500"
+                gainprm="65.09022288972247"
                 biastype="affine"
-                biasprm="0 -500 -40"
-                forcerange="-2.70 2.70"
+                biasprm="0 -65.09022288972247 -3.355927764578723"
+                forcerange="-3.1858238822248586 3.1858238822248586"
                 forcelimited="true"
             />
         </default>
