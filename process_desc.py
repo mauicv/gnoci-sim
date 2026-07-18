@@ -51,18 +51,31 @@ _JOINT_DEFAULTS: dict[str, float] = {
     'right_lower_leg__foot':        -0.3 * 0.75,
 }
 
+# _JOINT_LIMITS: dict[str, tuple[float, float]] = {
+#     'head__left_yoke':            (-0.3000,  0.2250),
+#     'left_yoke__hip':             (-0.1500,  0.2250),
+#     'left_hip__upper_leg':        (-0.3000,  0.4500),
+#     'left_upper_leg__lower_leg':  (-0.3000,  0.4500),
+#     'left_lower_leg__foot':       (-0.3000,  0.5250),
+#     'head__right_yoke':           (-0.3000,  0.2250),
+#     'right_yoke__hip':            (-0.1500,  0.2250),
+#     'right_hip__upper_leg':       (-0.3000,  0.4500),
+#     'right_upper_leg__lower_leg': (-0.3000,  0.4500),
+#     'right_lower_leg__foot':      (-0.3000,  0.5250),
+# }
+
 _JOINT_LIMITS: dict[str, tuple[float, float]] = {
-    'head__left_yoke':            (-0.3000,  0.2250),
-    'left_yoke__hip':             (-0.1500,  0.2250),
-    'left_hip__upper_leg':        (-0.3000,  0.4500),
-    'left_upper_leg__lower_leg':  (-0.3000,  0.4500),
-    'left_lower_leg__foot':       (-0.3000,  0.5250),
-    'head__right_yoke':           (-0.3000,  0.2250),
-    'right_yoke__hip':            (-0.1500,  0.2250),
-    'right_hip__upper_leg':       (-0.3000,  0.4500),
-    'right_upper_leg__lower_leg': (-0.3000,  0.4500),
-    'right_lower_leg__foot':      (-0.3000,  0.5250),
-}
+      'head__left_yoke':            (-0.287,  0.222),
+      'left_yoke__hip':             (-0.135,  0.216),
+      'left_hip__upper_leg':        (-0.260,  0.443),
+      'left_upper_leg__lower_leg':  (-0.300,  0.428),
+      'left_lower_leg__foot':       (-0.306,  0.495),
+      'head__right_yoke':           (-0.265,  0.226),
+      'right_yoke__hip':            (-0.135,  0.209),
+      'right_hip__upper_leg':       (-0.274,  0.455),
+      'right_upper_leg__lower_leg': (-0.280,  0.446),
+      'right_lower_leg__foot':      (-0.287,  0.526),
+  }
 
 # Left-side joints whose axis and range are flipped so that positive motion
 # means the same physical direction as the corresponding right-side joint.
@@ -262,8 +275,8 @@ def process(src, dst):
             continue
         default = _JOINT_DEFAULTS[name]
         lo_rel, hi_rel = _JOINT_LIMITS[name]
-        lo = (default + lo_rel) * math.pi
-        hi = (default + hi_rel) * math.pi
+        lo = lo_rel * math.pi
+        hi = hi_rel * math.pi
         joint.set("range", f"{lo:.10f} {hi:.10f}")
         joint.set("ref", f"{-default * math.pi:.10f}")
 
