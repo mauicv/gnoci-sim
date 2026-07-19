@@ -47,12 +47,12 @@ IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 # These MUST be mirrored in the real-robot obs pipeline (gnoci-control) and are
 # applied identically in ReferenceEnv so AMP compares like-for-like.
 _OBS_NORM = np.array(
-    [0.32] * _N_JOINTS      # joint positions  (already /pi, offset-removed)
-    + [3.5] * _N_JOINTS     # joint velocities (rad/s)
+    [0.52] * _N_JOINTS      # joint positions  (already /pi, offset-removed)
+    + [11.0] * _N_JOINTS    # joint velocities (rad/s)
     + [1.0] * _N_TOUCH      # binary foot contacts
-    + [1.4] * 3             # gyro  (already * IMU_GYRO_SCALE)
-    + [2.8] * 3             # accel (already / IMU_ACC_SCALE)
-    + [0.38] * 2,           # pitch, roll (rad)
+    + [2.5] * 3             # gyro  (already * IMU_GYRO_SCALE)
+    + [3.9] * 3             # accel (already / IMU_ACC_SCALE)
+    + [0.4] * 2,            # pitch, roll (rad)
     dtype=np.float32,
 )
 
