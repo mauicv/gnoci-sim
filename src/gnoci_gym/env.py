@@ -99,6 +99,9 @@ class GnociGymEnv(gym.Env):
         'orientation':  0.1,
         'heading':      0.3,
         'yoke_joint':   0.1,
+        'action_mag':   0.005,   # penalty: ||a_t||²  (commanded target velocity)
+        'action_rate':  0.01,    # penalty: ||a_t - a_{t-1}||²  (chatter)
+        'joint_pos':    0.005,   # penalty: deviation from zero pose
     }
 
     def __init__(
@@ -173,6 +176,8 @@ class GnociGymEnv(gym.Env):
         self._push_interval = self._sample_push_interval()
         self._action_delay = 0
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
+        self._prev_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
     def initialize_model(self):
         xml_content = _load_and_perturb_basic_xml(
@@ -333,6 +338,9 @@ class GnociGymEnv(gym.Env):
                 maxlen=self._action_delay + 1,
             )
 
+        self._prev_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
+
         noisey_state, state = self._get_obs()
         return noisey_state, {'state': state}
 
@@ -480,9 +488,30 @@ class GnociGymEnv(gym.Env):
         self._contact_buffer.append(single)
         return 1.0 if any(self._contact_buffer) else 0.0
 
+    def _get_smoothness_components(self):
+        c = self.reward_coefs
+        action_mag  = float(np.sum(np.square(self._last_action)))
+        action_rate = float(np.sum(np.square(self._last_action - self._prev_action)))
+        # joint positions in normalized units (already /pi -> roughly [-1, 1])
+        joint_pos = self._get_joint_positions() / np.pi
+        pos_mag = float(np.mean(np.square(joint_pos)))
+        # Penalties, returned as negative contributions so the components sum
+        # to the total reward.
+        return {
+            'action_mag':  -c['action_mag']  * action_mag,
+            'action_rate': -c['action_rate'] * action_rate,
+            'joint_pos':   -c['joint_pos']   * pos_mag,
+        }
+
+    def _get_smoothness_penalty(self):
+        return -sum(self._get_smoothness_components().values())
+
     def _get_reward(self):
+        """Return (total_reward, components) where the component values sum to
+        total_reward."""
         c = self.reward_coefs
         stand_reward = self._get_stand_reward()
+        components = self._get_smoothness_components()
 
         if self.task == 'walk':
             velocity_reward     = self._get_velocity_reward()
@@ -491,16 +520,23 @@ class GnociGymEnv(gym.Env):
             orientation_reward  = self._get_orientation_reward()
             heading_reward      = self._get_heading_reward()
             yoke_joint_reward   = self._get_yoke_joint_reward()
-            return (
-                c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
-                + c['foot_contact'] * foot_contact_reward
-                + c['foot_airtime'] * foot_airtime_reward
-                + c['orientation']  * orientation_reward
-                + c['heading']      * heading_reward
-                + c['yoke_joint']   * yoke_joint_reward
-            )
+            # stand and velocity are multiplicatively coupled; split them so
+            # that stand + velocity == c['stand'] * stand_reward * (1 + ...).
+            stand_base = c['stand'] * stand_reward
+            components.update({
+                'stand':        stand_base,
+                'velocity':     stand_base * c['velocity'] * velocity_reward,
+                'foot_contact': c['foot_contact'] * foot_contact_reward,
+                'foot_airtime': c['foot_airtime'] * foot_airtime_reward,
+                'orientation':  c['orientation']  * orientation_reward,
+                'heading':      c['heading']      * heading_reward,
+                'yoke_joint':   c['yoke_joint']   * yoke_joint_reward,
+            })
+        else:
+            components['stand'] = c['stand'] * stand_reward
 
-        return c['stand'] * stand_reward
+        total = float(sum(components.values()))
+        return total, components
 
     def step(self, action):
         action = action.clip(-1, 1)
@@ -508,6 +544,9 @@ class GnociGymEnv(gym.Env):
         if self.max_action_delay > 0:
             self._action_buffer.append(action.copy())
             action = self._action_buffer[0]
+
+        self._prev_action = self._last_action
+        self._last_action = action.copy().astype(np.float32)
 
         if self.push_force_max > 0:
             self.data.xfrc_applied[self.body_id] = 0
@@ -533,10 +572,11 @@ class GnociGymEnv(gym.Env):
                     self.data.ctrl[i] = self.servos[i].value * np.pi
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
-        reward = self._get_reward()
+        reward, reward_components = self._get_reward()
         if self.overturned() or self._root_body_on_ground():
             self.done = True
-        return (noisey_state, reward, self.done, self.done, {'state': state})
+        return (noisey_state, reward, self.done, self.done,
+                {'state': state, 'reward_components': reward_components})
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':
