@@ -102,6 +102,8 @@ class GnociGymEnv(gym.Env):
         'action_mag':   0.005,   # penalty: ||a_t||²  (commanded target velocity)
         'action_rate':  0.01,    # penalty: ||a_t - a_{t-1}||²  (chatter)
         'joint_pos':    0.005,   # penalty: deviation from zero pose
+        'alive':        0.5,     # bonus: added every surviving step
+        'termination':  5.0,     # penalty: subtracted once when the robot falls
     }
 
     def __init__(
@@ -536,6 +538,11 @@ class GnociGymEnv(gym.Env):
         else:
             components['stand'] = c['stand'] * stand_reward
 
+        # Constant survival bonus: raises the value of not terminating so the
+        # policy is not tempted to trade a short forward-velocity burst for an
+        # early fall. The matching one-off fall penalty is applied in step().
+        components['alive'] = c['alive']
+
         total = float(sum(components.values()))
         return total, components
 
@@ -576,7 +583,15 @@ class GnociGymEnv(gym.Env):
         reward, reward_components = self._get_reward()
         if self.overturned() or self._root_body_on_ground():
             self.done = True
-        return (noisey_state, reward, self.done, self.done,
+            # One-off fall penalty. Because this lands on the terminal step the
+            # critic does not bootstrap past it (done=1), so it directly lowers
+            # the value of states leading into a fall.
+            penalty = self.reward_coefs['termination']
+            reward -= penalty
+            reward_components['termination'] = -penalty
+        # `self.done` is a true termination (the robot fell), never a time-limit
+        # truncation, so report truncated=False.
+        return (noisey_state, reward, self.done, False,
                 {'state': state, 'reward_components': reward_components})
 
     def render(self, mode='rgb_array'):
