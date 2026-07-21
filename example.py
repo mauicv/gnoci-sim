@@ -44,8 +44,8 @@ root_uprights = []
 for i in tqdm(range(100)):
 
     # action = np.random.uniform(-1, 1, env.action_space.shape[0])
-    # action = np.random.randn(env.action_space.shape[0], 1) * 1
-    action = np.zeros(env.action_space.shape[0])
+    action = np.random.randn(env.action_space.shape[0], 1) * 0.1
+    # action = np.zeros(env.action_space.shape[0])
     # action[2] = 1
     # action[5+2] = 1
     # action[4] = 1

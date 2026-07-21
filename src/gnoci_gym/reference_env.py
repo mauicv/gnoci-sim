@@ -125,8 +125,11 @@ class ReferenceEnv:
             for i in range(n_ref):
                 for k in range(self.frame_stack):
                     # Match gym.wrappers.FrameStackObservation ordering: oldest
-                    # frame first, newest frame last.
-                    idx = (i - (self.frame_stack - 1 - k)) % n_ref
+                    # frame first, newest frame last. Frames are stepped by one
+                    # control step (n_substeps physics steps), not one physics
+                    # step, so the stacked frames span the same time as the env's
+                    # control-rate frame stack.
+                    idx = (i - (self.frame_stack - 1 - k) * self.n_substeps) % n_ref
                     stacked[i, k * _OBS_DIM:(k + 1) * _OBS_DIM] = dataset[idx]
             dataset = stacked
 
@@ -136,7 +139,10 @@ class ReferenceEnv:
         self,
         batch_size: int,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
+        """Sample state transition pairs (s_i, s_{i+1 control step}) from the reference.
+
+        The successor is one control step (n_substeps physics steps) ahead, so the
+        transition spans the same time as an env transition from `loader.sample_pairs`.
 
         Returns:
             Tuple of (s_i, s_next), each an np.ndarray of shape (batch_size, *obs_shape).
@@ -144,7 +150,7 @@ class ReferenceEnv:
         n_ref = len(self._dataset)
         inds = np.random.randint(0, n_ref, size=batch_size)
         s_i = self._dataset[inds]
-        s_next = self._dataset[(inds + 1) % n_ref]
+        s_next = self._dataset[(inds + self.n_substeps) % n_ref]
         return s_i, s_next
 
     def get_reference(self) -> np.ndarray:

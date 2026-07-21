@@ -283,6 +283,7 @@ class GnociGymEnv(gym.Env):
                 name=name,
                 pin_limits=(lo / np.pi, hi / np.pi),
                 init_value=0.0,
+                action_filter_alpha=self.action_filter_alpha,
             )
             # We advance the PID once per `servo_update_every` substeps, so the
             # simple_pid wall-clock rate gate must be disabled — sim time is not

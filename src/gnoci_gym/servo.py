@@ -24,6 +24,7 @@ class Servo:
     freq: int = FREQ
     control_hz: int = CONTROL_HZ
     max_delta_v: float = MAX_DELTA_V
+    action_filter_alpha: float = 0.4
 
     low_pass_filter: LowPassFilter = None
 
@@ -37,7 +38,7 @@ class Servo:
             sample_time=1.0 / self.freq,
         )
         self.action_scale = self.max_delta_v / self.control_hz
-        self.low_pass_filter = LowPassFilter(alpha=0.4)
+        self.low_pass_filter = LowPassFilter(alpha=self.action_filter_alpha)
         self.low_pass_filter.reset()
 
     def update_setpoint_delta(self, setpoint_delta: float):
