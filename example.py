@@ -41,6 +41,8 @@ standing_height = []
 root_heights = []
 root_uprights = []
 
+too_low = []
+
 for i in tqdm(range(100)):
 
     # action = np.random.uniform(-1, 1, env.action_space.shape[0])
@@ -66,6 +68,7 @@ for i in tqdm(range(100)):
     times.append(env.unwrapped.data.time)
     dones.append(int(done))
     touching_floor.append(int(env.unwrapped._root_body_on_ground()))
+    too_low.append(int(env.unwrapped._too_low()))
 
     # actions.append(action)
     # control.append(env.unwrapped.data.ctrl.copy())
@@ -73,13 +76,15 @@ for i in tqdm(range(100)):
     rewards.append(reward)
     frames.append(env.render())
 
-plt.plot(times, rewards)
-plt.plot(times, touching_floor)
+# plt.plot(times, rewards)
+# plt.plot(times, touching_floor)
 # plt.plot(times, root_uprights)
 # plt.plot(times, rewards)
 # plt.plot(times, dones)
 # plt.plot(times, contacts)
-plt.show()
 
 imageio.mimsave(f'assets/animation.gif', frames, loop=0, fps=30)
 
+plt.plot(times, too_low)
+plt.savefig('assets/root_height.png')
+plt.close()

@@ -8,7 +8,8 @@ from .filters import ComplementaryFilter
 from .servo import Servo
 from .config import CONTROL_HZ, FREQ
 
-_STANDING_HEIGHT = 0.23
+_STANDING_HEIGHT = 0.225
+_MIN_STANDING_HEIGHT = 0.15
 
 _JOINT_NAMES = [
     'head__left_yoke',
@@ -391,6 +392,9 @@ class GnociGymEnv(gym.Env):
                 return True
         return False
 
+    def _too_low(self):
+        return self._get_root_height() < _MIN_STANDING_HEIGHT
+
     def _get_root_upright(self):
         xmat = self.data.xmat[self.body_id]
         z_axis = np.array([xmat[6], xmat[7], xmat[8]])
@@ -581,7 +585,7 @@ class GnociGymEnv(gym.Env):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward, reward_components = self._get_reward()
-        if self.overturned() or self._root_body_on_ground():
+        if self.overturned() or self._root_body_on_ground() or self._too_low():
             self.done = True
             # One-off fall penalty. Because this lands on the terminal step the
             # critic does not bootstrap past it (done=1), so it directly lowers
