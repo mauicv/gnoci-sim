@@ -447,7 +447,7 @@ class GnociGymEnv(gym.Env):
         standing = tolerance(
             height,
             bounds=(_STANDING_HEIGHT, float('inf')),
-            margin=_STANDING_HEIGHT / 2,
+            margin=_STANDING_HEIGHT / 4,
         )
         upright = (1 + upright) / 2
         return (3 * standing + upright) / 4
