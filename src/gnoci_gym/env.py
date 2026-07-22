@@ -9,7 +9,7 @@ from .servo import Servo
 from .config import CONTROL_HZ, FREQ
 
 _STANDING_HEIGHT = 0.225
-_MIN_STANDING_HEIGHT = 0.15
+_MIN_STANDING_HEIGHT = 0.175
 
 _JOINT_NAMES = [
     'head__left_yoke',
@@ -102,7 +102,7 @@ class GnociGymEnv(gym.Env):
         'yoke_joint':   0.1,
         'action_mag':   0.005,   # penalty: ||a_t||²  (commanded target velocity)
         'action_rate':  0.01,    # penalty: ||a_t - a_{t-1}||²  (chatter)
-        'joint_pos':    0.005,   # penalty: deviation from zero pose
+        'joint_pos':    0.5,   # reward: tolerance() bonus for joints near zero pose
         'alive':        0.5,     # bonus: added every surviving step
         'termination':  5.0,     # penalty: subtracted once when the robot falls
     }
@@ -477,6 +477,14 @@ class GnociGymEnv(gym.Env):
             for i in yoke_indices
         ]))
 
+    def _get_joint_pos_reward(self):
+        # Encourage all joints to stay near their default position of 0.0.
+        positions = self._get_joint_positions()
+        return float(np.mean([
+            tolerance(float(p), bounds=(0.0, 0.0), margin=0.2)
+            for p in positions
+        ]))
+
     def _get_heading_reward(self):
         xmat = self.data.xmat[self.body_id]
         # Body forward direction in world XY plane (-Y body axis, rewarded motion is -Y world)
@@ -499,19 +507,12 @@ class GnociGymEnv(gym.Env):
         c = self.reward_coefs
         action_mag  = float(np.sum(np.square(self._last_action)))
         action_rate = float(np.sum(np.square(self._last_action - self._prev_action)))
-        # joint positions in normalized units (already /pi -> roughly [-1, 1])
-        joint_pos = self._get_joint_positions() / np.pi
-        pos_mag = float(np.mean(np.square(joint_pos)))
         # Penalties, returned as negative contributions so the components sum
         # to the total reward.
         return {
             'action_mag':  -c['action_mag']  * action_mag,
             'action_rate': -c['action_rate'] * action_rate,
-            'joint_pos':   -c['joint_pos']   * pos_mag,
         }
-
-    def _get_smoothness_penalty(self):
-        return -sum(self._get_smoothness_components().values())
 
     def _get_reward(self):
         """Return (total_reward, components) where the component values sum to
@@ -519,6 +520,7 @@ class GnociGymEnv(gym.Env):
         c = self.reward_coefs
         stand_reward = self._get_stand_reward()
         components = self._get_smoothness_components()
+        components['joint_pos'] = c['joint_pos'] * self._get_joint_pos_reward()
 
         if self.task == 'walk':
             velocity_reward     = self._get_velocity_reward()
