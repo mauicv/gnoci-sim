@@ -93,18 +93,19 @@ class GnociGymEnv(gym.Env):
     metadata = {'render_modes': ['rgb_array']}
 
     DEFAULT_REWARD_COEFS = {
-        'stand':        1.0,
-        'velocity':     2.5,
-        'foot_contact': 0.75,
-        'foot_airtime': 0.5,
-        'orientation':  0.1,
-        'heading':      0.3,
-        'yoke_joint':   0.1,
-        'action_mag':   0.005,   # penalty: ||a_t||²  (commanded target velocity)
-        'action_rate':  0.01,    # penalty: ||a_t - a_{t-1}||²  (chatter)
-        'joint_pos':    0.5,   # reward: tolerance() bonus for joints near zero pose
-        'alive':        0.5,     # bonus: added every surviving step
-        'termination':  5.0,     # penalty: subtracted once when the robot falls
+        'stand':          1.0,
+        'velocity':       2.5,
+        'foot_contact':   0.75,
+        'foot_airtime':   0.5,
+        'foot_clearance': 0.5,
+        'orientation':    0.1,
+        'heading':        0.3,
+        'yoke_joint':     0.1,
+        'action_mag':     0.005,  # penalty: ||a_t||²  (commanded target velocity)
+        'action_rate':    0.01,   # penalty: ||a_t - a_{t-1}||²  (chatter)
+        'joint_pos':      0.5,    # reward: tolerance() bonus for joints near zero pose
+        'alive':          0.5,    # bonus: added every surviving step
+        'termination':    5.0,    # penalty: subtracted once when the robot falls
     }
 
     def __init__(
@@ -126,6 +127,11 @@ class GnociGymEnv(gym.Env):
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
             action_filter_alpha=0.4,
+            # Half the reference walk gait's peak inter-foot height clearance
+            # (~0.043m, computed from reference/xml/walk.xml via ReferenceEnv's
+            # model) — so a step matching the reference's peak swing height
+            # earns full credit (2 * foot_clearance_height == peak clearance).
+            foot_clearance_height=0.02,
             task='stand',
             reward_coefs=None,
             fix_root_body=False,
@@ -158,6 +164,7 @@ class GnociGymEnv(gym.Env):
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
         self.action_filter_alpha = action_filter_alpha
+        self.foot_clearance_height = foot_clearance_height
         self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
@@ -209,6 +216,12 @@ class GnociGymEnv(gym.Env):
         ]
         self.body_id = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_BODY, "head_base"
+        )
+        self.left_foot_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "left_foot_base"
+        )
+        self.right_foot_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "right_foot_base"
         )
         try:
             self.floor_geom_id = self.model.geom("floor").id
@@ -441,6 +454,19 @@ class GnociGymEnv(gym.Env):
         self._foot_was_contact = current
         return reward
 
+    def _get_foot_clearance_reward(self):
+        """Reward committing to a step: credit the height difference between the
+        feet so one foot must clearly leave the ground. Exactly 0 when both feet
+        are at the same height (e.g. planted), ramping to 1 once the swing foot
+        is ``2 * foot_clearance_height`` above the stance foot."""
+        threshold = self.foot_clearance_height
+        if threshold <= 0.0:
+            return 0.0
+        lz = self.data.xpos[self.left_foot_body_id][2]
+        rz = self.data.xpos[self.right_foot_body_id][2]
+        clearance = abs(lz - rz)
+        return float(np.clip((clearance - threshold) / threshold, 0.0, 1.0))
+
     def _get_stand_reward(self):
         upright = self._get_root_upright()
         height  = self._get_root_height()
@@ -523,23 +549,25 @@ class GnociGymEnv(gym.Env):
         components['joint_pos'] = c['joint_pos'] * self._get_joint_pos_reward()
 
         if self.task == 'walk':
-            velocity_reward     = self._get_velocity_reward()
-            foot_contact_reward = self._get_foot_contact_reward()
-            foot_airtime_reward = self._get_foot_airtime_reward()
-            orientation_reward  = self._get_orientation_reward()
-            heading_reward      = self._get_heading_reward()
-            yoke_joint_reward   = self._get_yoke_joint_reward()
+            velocity_reward       = self._get_velocity_reward()
+            foot_contact_reward   = self._get_foot_contact_reward()
+            foot_airtime_reward   = self._get_foot_airtime_reward()
+            foot_clearance_reward = self._get_foot_clearance_reward()
+            orientation_reward    = self._get_orientation_reward()
+            heading_reward        = self._get_heading_reward()
+            yoke_joint_reward     = self._get_yoke_joint_reward()
             # stand and velocity are multiplicatively coupled; split them so
             # that stand + velocity == c['stand'] * stand_reward * (1 + ...).
             stand_base = c['stand'] * stand_reward
             components.update({
-                'stand':        stand_base,
-                'velocity':     stand_base * c['velocity'] * velocity_reward,
-                'foot_contact': c['foot_contact'] * foot_contact_reward,
-                'foot_airtime': c['foot_airtime'] * foot_airtime_reward,
-                'orientation':  c['orientation']  * orientation_reward,
-                'heading':      c['heading']      * heading_reward,
-                'yoke_joint':   c['yoke_joint']   * yoke_joint_reward,
+                'stand':          stand_base,
+                'velocity':       stand_base * c['velocity'] * velocity_reward,
+                'foot_contact':   c['foot_contact']   * foot_contact_reward,
+                'foot_airtime':   c['foot_airtime']   * foot_airtime_reward,
+                'foot_clearance': c['foot_clearance'] * foot_clearance_reward,
+                'orientation':    c['orientation']    * orientation_reward,
+                'heading':        c['heading']        * heading_reward,
+                'yoke_joint':     c['yoke_joint']     * yoke_joint_reward,
             })
         else:
             components['stand'] = c['stand'] * stand_reward

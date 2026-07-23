@@ -42,6 +42,7 @@ root_heights = []
 root_uprights = []
 
 too_low = []
+states = []
 
 for i in tqdm(range(100)):
 
@@ -59,7 +60,7 @@ for i in tqdm(range(100)):
     # action = np.ones(env.action_space.shape[0])
     # action = env.unwrapped.data.ctrl.copy()
     state, reward, done, truncated, _ = env.step(action)
-
+    states.append(state.copy()[0:10].flatten())
     root_height = env.unwrapped._get_root_height()
     root_upright = env.unwrapped._get_root_upright()
     root_heights.append(root_height)
@@ -85,6 +86,6 @@ for i in tqdm(range(100)):
 
 imageio.mimsave(f'assets/animation.gif', frames, loop=0, fps=30)
 
-plt.plot(times, too_low)
+plt.plot(times, states)
 plt.savefig('assets/root_height.png')
 plt.close()
