@@ -15,4 +15,5 @@ FREQ = 100
 KP = 1.0
 KI = 0.0
 KD = 0.0
-MAX_DELTA_V = 10.0
+# MAX_DELTA_V = 10.0
+MAX_DELTA_V = 1

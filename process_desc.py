@@ -156,10 +156,16 @@ PART_MASSES: dict[str, float] = {
     "right_foot_right_side": 0.037,
 }
 
+# JOINT_ATTRS = {
+#     "damping": 0.20748324285704314,
+#     "frictionloss": 0.008398011061633381,
+#     "armature": 0.01698398900680475
+# }
+
 JOINT_ATTRS = {
-    "damping": 0.20748324285704314,
-    "frictionloss": 0.008398011061633381,
-    "armature": 0.01698398900680475
+    "damping": 0,
+    "frictionloss": 0,
+    "armature": 0
 }
 
 def _indent(elem, level=0):

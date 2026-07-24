@@ -3,16 +3,12 @@
     <include file="src/gnoci_gym/desc/gnoci.xml" />
     <default>
         <default class="miuzei_25kg">
-            <general
-                dyntype="filter"
-                dynprm="0.016292180996752285"
-                gaintype="fixed"
-                gainprm="65.09022288972247"
-                biastype="affine"
-                biasprm="0 -65.09022288972247 -3.355927764578723"
-                forcerange="-3.1858238822248586 3.1858238822248586"
-                forcelimited="true"
-            />
+            <position 
+                kp="25.0"
+                kv="5.0"
+                ctrllimited="true"
+                forcerange="-2.70 2.70"
+                forcelimited="true"/>
         </default>
     </default>
 
