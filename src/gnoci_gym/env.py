@@ -9,7 +9,7 @@ from .servo import Servo
 from .config import CONTROL_HZ, FREQ
 
 _STANDING_HEIGHT = 0.225
-_MIN_STANDING_HEIGHT = 0.175
+_MIN_STANDING_HEIGHT = 0.15
 
 _JOINT_NAMES = [
     'head__left_yoke',
