@@ -311,6 +311,7 @@ class GnociGymEnv(gym.Env):
     def _get_reward(self):
         c = self.reward_coefs
         stand_reward = self._get_stand_reward()
+        components = {}
 
         if self.task == 'walk':
             velocity_reward     = self._get_velocity_reward()
@@ -319,6 +320,17 @@ class GnociGymEnv(gym.Env):
             orientation_reward  = self._get_orientation_reward()
             heading_reward      = self._get_heading_reward()
             yoke_joint_reward   = self._get_yoke_joint_reward()
+
+            components.update({
+                'stand':          c['stand'] * stand_reward,
+                'velocity':       c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward),
+                'foot_contact':   c['foot_contact']   * foot_contact_reward,
+                'foot_airtime':   c['foot_airtime']   * foot_airtime_reward,
+                'orientation':    c['orientation']    * orientation_reward,
+                'heading':        c['heading']        * heading_reward,
+                'yoke_joint':     c['yoke_joint']     * yoke_joint_reward,
+            })
+
             return (
                 c['stand'] * stand_reward * (1 + c['velocity'] * velocity_reward)
                 + c['foot_contact'] * foot_contact_reward
@@ -326,9 +338,9 @@ class GnociGymEnv(gym.Env):
                 + c['orientation']  * orientation_reward
                 + c['heading']      * heading_reward
                 + c['yoke_joint']   * yoke_joint_reward
-            )
+            ), components
 
-        return c['stand'] * stand_reward
+        return c['stand'] * stand_reward, components
 
     def step(self, action):
         action = action.clip(-1, 1)
@@ -339,10 +351,10 @@ class GnociGymEnv(gym.Env):
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         state = self._get_obs()
-        reward = self._get_reward()
+        reward, reward_components = self._get_reward()
         if self.overturned():
             self.done = True
-        return (state, reward, self.done, self.done, {})
+        return (state, reward, self.done, self.done, {'reward_components': reward_components})
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':

@@ -27,6 +27,7 @@ env = GnociGymEnv(
     action_filter_alpha=1,
     control_hz=40,
     max_joint_vel=6,
+    task='walk',
 )
 
 state, *_ = env.reset(seed=0)
@@ -50,7 +51,9 @@ for i in tqdm(range(100)):
     action = np.random.uniform(-1, 1, env.action_space.shape[0])
     # action = np.ones(env.action_space.shape[0])
     # action = env.unwrapped.data.ctrl.copy()
-    state, reward, done, truncated, _ = env.step(action)
+    state, reward, done, truncated, info = env.step(action)
+
+    components = info['reward_components']
 
     root_height = env.unwrapped._get_root_height()
     root_upright = env.unwrapped._get_root_upright()
