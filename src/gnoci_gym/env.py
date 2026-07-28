@@ -590,6 +590,7 @@ class GnociGymEnv(gym.Env):
     def _get_reward(self):
         c = self.reward_coefs
         stand_gate = self._get_stand_gate()
+        components = {'stand_gate': stand_gate}
 
         if self.task == 'walk':
             velocity_reward      = self._get_velocity_reward()
@@ -615,16 +616,31 @@ class GnociGymEnv(gym.Env):
                 + c['heading']   * heading_reward
                 + c['yoke_joint'] * yoke_joint_reward
             )
+            fall_term = -c['fall'] * (1.0 - stand_gate)
             # The shaped reward is gated by posture quality (so falling throttles
             # it toward 0). The only thing payable while still is the decaying
             # survival_bonus; falling is penalised rather than rewarded.
-            return (
-                stand_gate * (locomotion + posture)
-                + self.survival_bonus
-                - c['fall'] * (1.0 - stand_gate)
-            )
+            reward = stand_gate * (locomotion + posture) + self.survival_bonus + fall_term
 
-        return c['stand'] * stand_gate
+            # Each value here is the final, weighted/gated contribution to
+            # `reward` (not the raw [0, 1] signal) — they sum exactly to the
+            # total, so they can be plotted as a stacked breakdown.
+            components.update({
+                'velocity':       stand_gate * c['velocity']       * velocity_reward,
+                'foot_contact':   stand_gate * c['foot_contact']   * foot_contact_reward,
+                'foot_airtime':   stand_gate * c['foot_airtime']   * foot_airtime_reward,
+                'foot_clearance': stand_gate * c['foot_clearance'] * foot_clearance_reward,
+                'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
+                'heading':        stand_gate * velocity_reward * c['heading']    * heading_reward,
+                'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint'] * yoke_joint_reward,
+                'survival_bonus': self.survival_bonus,
+                'fall':           fall_term,
+            })
+            return reward, components
+
+        reward = c['stand'] * stand_gate
+        components['stand'] = reward
+        return reward, components
 
     def step(self, action):
         # not sure why but this matches the real robot better
@@ -655,10 +671,10 @@ class GnociGymEnv(gym.Env):
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
-        reward = self._get_reward()
+        reward, reward_components = self._get_reward()
         if self.overturned() or self._root_body_on_ground():
             self.done = True
-        return (noisey_state, reward, self.done, self.done, {'state': state})
+        return (noisey_state, reward, self.done, self.done, {'state': state, 'reward_components': reward_components})
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':
