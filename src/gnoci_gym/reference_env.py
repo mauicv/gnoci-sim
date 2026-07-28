@@ -69,22 +69,34 @@ class ReferenceEnv:
         self.comp_filter = ComplementaryFilter()
 
     def _build_dataset(self) -> np.ndarray:
-        n_ref = int(round(self.period / PHYSICS_DT))
+        # Dataset rows must be spaced by exactly one env.step() worth of sim
+        # time (n_substeps physics steps), not one physics step, so that
+        # sample_pairs() returns (s_t, s_{t+dt}) pairs at the same dt as
+        # consecutive GnociGymEnv.step() observations. We still interpolate
+        # the trajectory at physics-step resolution (n_fine) so the ±n_substeps
+        # finite-difference velocity window below has fine-grained samples to
+        # work with, but only every n_substeps-th fine sample is written out
+        # to `dataset`. n_fine is an exact multiple of n_substeps so those
+        # window lookups always land on other coarse-frame-aligned samples.
+        n_coarse = max(1, int(round(self.period * self.control_hz)))
+        n_fine = n_coarse * self.n_substeps
+
         keys = _load_keyframes(_REFERENCE_XML[self.task])
-        traj = interpolate(keys, n_frames=n_ref)  # (n_ref, 17)
+        traj = interpolate(keys, n_frames=n_fine)  # (n_fine, 17)
 
         saved_qpos = self.data.qpos.copy()
         saved_qvel = self.data.qvel.copy()
         self.comp_filter.reset()
 
-        dataset = np.zeros((n_ref, _OBS_DIM), dtype=np.float32)
+        dataset = np.zeros((n_coarse, _OBS_DIM), dtype=np.float32)
         vel_window = 2.0 / self.control_hz  # time span of centered difference
 
-        for i in range(n_ref):
+        for k in range(n_coarse):
+            i = k * self.n_substeps
             self.data.qpos[:traj.shape[1]] = traj[i]
 
-            i_fwd = (i + self.n_substeps) % n_ref
-            i_bwd = (i - self.n_substeps) % n_ref
+            i_fwd = (i + self.n_substeps) % n_fine
+            i_bwd = (i - self.n_substeps) % n_fine
             vel = (traj[i_fwd, 7:] - traj[i_bwd, 7:]) / vel_window
             for j, dof_addr in enumerate(self.joint_dof_addrs):
                 self.data.qvel[dof_addr] = vel[j]
@@ -93,12 +105,15 @@ class ReferenceEnv:
 
             gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
             acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
-            self.comp_filter.update(acc, gyro, dt=PHYSICS_DT)
+            # One filter update per dataset row (i.e. per control step), matching
+            # how GnociGymEnv._get_pitch_and_roll updates the filter once per
+            # env.step() rather than once per physics substep.
+            self.comp_filter.update(acc, gyro, dt=1.0 / self.control_hz)
 
-            joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[i] for i, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
+            joint_pos = [jp/np.pi - _DEFAULT_JOINT_POS_ARRAY[j] for j, jp in enumerate(self.data.sensordata[self.joint_pos_sensor_addrs])]
             joint_vel = self.data.qvel[self.joint_dof_addrs]
 
-            dataset[i] = np.array([
+            dataset[k] = np.array([
                 *joint_pos,
                 *joint_vel,
                 *(self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32),
@@ -118,12 +133,12 @@ class ReferenceEnv:
         dataset /= _OBS_NORM
 
         if self.frame_stack > 1:
-            stacked = np.zeros((n_ref, _OBS_DIM * self.frame_stack), dtype=np.float32)
-            for i in range(n_ref):
+            stacked = np.zeros((n_coarse, _OBS_DIM * self.frame_stack), dtype=np.float32)
+            for i in range(n_coarse):
                 for k in range(self.frame_stack):
                     # Match gym.wrappers.FrameStackObservation ordering: oldest
                     # frame first, newest frame last.
-                    idx = (i - (self.frame_stack - 1 - k)) % n_ref
+                    idx = (i - (self.frame_stack - 1 - k)) % n_coarse
                     stacked[i, k * _OBS_DIM:(k + 1) * _OBS_DIM] = dataset[idx]
             dataset = stacked
 
