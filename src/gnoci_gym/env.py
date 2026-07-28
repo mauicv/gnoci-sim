@@ -4,7 +4,7 @@ import numpy as np
 import os
 from collections import deque
 from .utils import tolerance
-from .load_xml import _load_and_perturb_basic_xml
+from .load_xml import _load_xml
 from .filters import ComplementaryFilter, EMAFilter
 from .config import CONTROL_HZ
 import math
@@ -198,7 +198,8 @@ class GnociGymEnv(gym.Env):
         self.action_space = gym.spaces.Box(
             -1, 1, shape=(_N_JOINTS,), dtype=np.float32
         )
-        self.initialize_model()
+        self._build_model()
+        self._randomize_dynamics()
         self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
@@ -209,15 +210,13 @@ class GnociGymEnv(gym.Env):
         self._action_delay = 0
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
 
-    def initialize_model(self):
-        xml_content = _load_and_perturb_basic_xml(
-            'scene',
-            inertial_mass_range=self.inertial_mass_range,
-            inertial_mass_noise=self.inertial_mass_noise,
-            floor_tilt_range=self.floor_tilt_range,
-            floor_friction_range=self.floor_friction_range,
-            fix_root_body=self.fix_root_body,
-        )
+    def _build_model(self):
+        """One-time model compile + cache. Not called on reset() — only the
+        MjData (via mj_resetData) and the per-episode dynamics randomization
+        (via _randomize_dynamics) change between episodes. Recompiling from
+        XML and recreating the Renderer on every reset used to dominate PPO
+        wall-clock (~180x the cost of a single physics step)."""
+        xml_content = _load_xml('scene', fix_root_body=self.fix_root_body)
         self.model = mujoco.MjModel.from_xml_string(xml_content)
         self.model.opt.timestep = PHYSICS_DT
         self.data = mujoco.MjData(self.model)
@@ -269,29 +268,70 @@ class GnociGymEnv(gym.Env):
             for n in ["imu-gyro", "imu-acc"]
         ]
 
+        # Base (unrandomized) values, snapshotted once so per-episode dynamics
+        # randomization in _randomize_dynamics() can be resampled from a fixed
+        # reference each reset instead of compounding on the previous episode's
+        # already-randomized values.
+        self._base_body_mass = self.model.body_mass.copy()
+        self._base_body_inertia = self.model.body_inertia.copy()
+        self._randomizable_body_ids = np.nonzero(self._base_body_mass > 0)[0]
+        self._base_actuator_gainprm = self.model.actuator_gainprm.copy()
+        self._base_actuator_biasprm = self.model.actuator_biasprm.copy()
+        self._base_gravity_z = float(self.model.opt.gravity[2])
+
+        self.comp_filter = ComplementaryFilter()
+        self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
+        self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
+        self._foot_airtime = [0.0, 0.0]
+        self._foot_was_contact = [False, False]
+
+        if hasattr(self, '_renderer') and self._renderer is not None:
+            self._renderer.close()
+        self._renderer = mujoco.Renderer(self.model)
+
+    def _randomize_dynamics(self):
+        """Per-episode domain randomization, applied directly to the already-
+        compiled model (no XML/recompile involved)."""
+        for body_id in self._randomizable_body_ids:
+            scale = (
+                1.0
+                + np.random.uniform(*self.inertial_mass_range)
+                + np.random.normal(0, self.inertial_mass_noise)
+            )
+            self.model.body_mass[body_id] = self._base_body_mass[body_id] * scale
+            self.model.body_inertia[body_id] = self._base_body_inertia[body_id] * scale
+
+        if self.floor_geom_id != -1:
+            self.model.geom_friction[self.floor_geom_id, 0] = np.random.uniform(*self.floor_friction_range)
+
+            if self.floor_tilt_range > 0:
+                roll  = np.random.uniform(-self.floor_tilt_range, self.floor_tilt_range)
+                pitch = np.random.uniform(-self.floor_tilt_range, self.floor_tilt_range)
+                qr = [np.cos(roll  / 2), np.sin(roll  / 2), 0.0, 0.0]
+                qp = [np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0]
+                w = qr[0]*qp[0] - qr[1]*qp[1] - qr[2]*qp[2] - qr[3]*qp[3]
+                x = qr[0]*qp[1] + qr[1]*qp[0] + qr[2]*qp[3] - qr[3]*qp[2]
+                y = qr[0]*qp[2] - qr[1]*qp[3] + qr[2]*qp[0] + qr[3]*qp[1]
+                z = qr[0]*qp[3] + qr[1]*qp[2] - qr[2]*qp[1] + qr[3]*qp[0]
+                self.model.geom_quat[self.floor_geom_id] = [w, x, y, z]
+
         for dof_addr in self.joint_dof_addrs:
             self.model.dof_frictionloss[dof_addr] = np.random.uniform(*self.joint_friction_range)
             self.model.dof_armature[dof_addr] = np.random.uniform(*self.joint_armature_range)
 
         for i in range(self.model.nu):
             scale = np.random.uniform(*self.actuator_gain_range)
-            self.model.actuator_gainprm[i, 0] *= scale
-            self.model.actuator_biasprm[i, 1] *= scale
+            self.model.actuator_gainprm[i, 0] = self._base_actuator_gainprm[i, 0] * scale
+            self.model.actuator_biasprm[i, 1] = self._base_actuator_biasprm[i, 1] * scale
 
         if self.gravity_noise > 0:
-            self.model.opt.gravity[2] += np.random.normal(0, self.gravity_noise)
+            self.model.opt.gravity[2] = self._base_gravity_z + np.random.normal(0, self.gravity_noise)
 
-        self.comp_filter = ComplementaryFilter()
-        self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
-        grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
-        self._contact_buffer = deque([False] * grace_steps, maxlen=grace_steps)
-        self._foot_airtime = [0.0, 0.0]
-        self._foot_was_contact = [False, False]
-
-        # Add at the end:
-        if hasattr(self, '_renderer') and self._renderer is not None:
-            self._renderer.close()
-        self._renderer = mujoco.Renderer(self.model)
+        # Recompute compile-time-derived constants (e.g. body/dof invweight)
+        # that depend on the mass/inertia values just edited above. Far
+        # cheaper than a full XML recompile.
+        mujoco.mj_setConst(self.model, self.data)
 
     def _set_joint_positions(self, joint_positions):
         for jnt_name, pos in joint_positions.items():
@@ -345,8 +385,8 @@ class GnociGymEnv(gym.Env):
         return np.random.randint(lo, hi + 1)
 
     def reset(self, seed=None, **kwargs):
-        self.initialize_model()
         mujoco.mj_resetData(self.model, self.data)
+        self._randomize_dynamics()
         self._set_joint_positions(_DEFAULT_JOINT_POSITIONS)
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
@@ -356,6 +396,10 @@ class GnociGymEnv(gym.Env):
 
         self._push_step = 0
         self._push_interval = self._sample_push_interval()
+
+        self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
+        self._foot_airtime = [0.0, 0.0]
+        self._foot_was_contact = [False, False]
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)

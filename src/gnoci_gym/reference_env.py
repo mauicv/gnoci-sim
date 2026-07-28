@@ -15,7 +15,7 @@ from .env import (
     _OBS_NORM,
 )
 from .filters import ComplementaryFilter
-from .load_xml import _load_and_perturb_basic_xml
+from .load_xml import _load_xml
 from .reference.interpolate_walk import _load_keyframes, interpolate
 
 _REFERENCE_XML = {
@@ -41,12 +41,7 @@ class ReferenceEnv:
         self._dataset = self._build_dataset()
 
     def _initialize_model(self):
-        xml = _load_and_perturb_basic_xml(
-            'scene',
-            inertial_mass_range=(0.0, 0.0),
-            inertial_mass_noise=0.0,
-            floor_tilt_range=0.0,
-        )
+        xml = _load_xml('scene')
         self.model = mujoco.MjModel.from_xml_string(xml)
         self.model.opt.timestep = PHYSICS_DT
         self.data = mujoco.MjData(self.model)

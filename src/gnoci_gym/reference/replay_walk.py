@@ -22,7 +22,7 @@ import numpy as np
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent.parent.parent))
 
-from gnoci_gym.load_xml import _load_and_perturb_basic_xml
+from gnoci_gym.load_xml import _load_xml
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--period", type=float, default=1.0,             help="Gait cycle duration (seconds)")
     args = parser.parse_args()
 
-    xml = _load_and_perturb_basic_xml("scene")
+    xml = _load_xml("scene")
     model = mujoco.MjModel.from_xml_string(xml)
     data  = mujoco.MjData(model)
 
