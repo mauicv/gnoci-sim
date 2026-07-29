@@ -143,6 +143,11 @@ PART_MASSES: dict[str, float] = {
     "right_foot_right_side": 0.037,
 }
 
+JOINT_ATTRS = {
+    'damping': 0.17889452739994438,
+    'frictionloss': 0.0072408653310164755,
+    'armature': 0.014643797951585229,
+}
 
 def _indent(elem, level=0):
     """Add pretty-print indentation in-place (Python < 3.9 compat)."""
@@ -277,6 +282,17 @@ def process(src, dst):
             imu.set("pos", "0.0202673 -0.0559394 0.0971252")
             imu.set("quat", "0 1 0 0")
             break
+
+    # ── set joint dynamics attributes (damping/frictionloss/armature) ────────
+    joints_tuned = 0
+    for joint in root.iter("joint"):
+        if joint.get("type", "hinge") == "free":
+            continue
+        if not joint.get("name"):
+            continue
+        for attr, value in JOINT_ATTRS.items():
+            joint.set(attr, str(value))
+        joints_tuned += 1
 
     # ── write output ──────────────────────────────────────────────────────────
     _indent(root)
