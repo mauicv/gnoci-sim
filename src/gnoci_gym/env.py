@@ -41,25 +41,6 @@ MAX_JOINT_VEL = 10.0    # max joint angular velocity (rad/s) — scales action d
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
-# NOTE: Not sure why this is half above?
-
-# Per-dimension observation normalisation divisors. Each value is the ~99th
-# percentile of |obs| measured from random-action rollouts, chosen so every
-# channel lands at roughly unit scale before entering the encoder. Without this
-# raw joint velocities (~1.3 std) dominate joint positions / pitch-roll (~0.1
-# std) in both the encoder gradients and the world-model reconstruction loss.
-# These MUST be mirrored in the real-robot obs pipeline (gnoci-control) and are
-# applied identically in ReferenceEnv so AMP compares like-for-like.
-_OBS_NORM = np.array(
-    [0.32] * _N_JOINTS      # joint positions  (already /pi, offset-removed)
-    + [3.5] * _N_JOINTS     # joint velocities (rad/s)
-    + [1.0] * _N_TOUCH      # binary foot contacts
-    + [1.4] * 3             # gyro  (already * IMU_GYRO_SCALE)
-    + [2.8] * 3             # accel (already / IMU_ACC_SCALE)
-    + [0.38] * 2,           # pitch, roll (rad)
-    dtype=np.float32,
-)
-
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
@@ -409,7 +390,6 @@ class GnociGymEnv(gym.Env):
             *acc,
             *self._get_pitch_and_roll(gyro * 250, acc),
         ])
-        obs = obs / _OBS_NORM
         if self.obs_noise_scale > 0:
             noisey_obs = obs + np.random.normal(0, self.obs_noise_scale, obs.shape)
         else:

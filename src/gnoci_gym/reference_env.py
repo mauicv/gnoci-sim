@@ -11,7 +11,6 @@ from .env import (
     IMU_ACC_SCALE,
     _JOINT_NAMES,
     _TOUCH_SENSOR_NAMES,
-    _OBS_NORM,
 )
 from .filters import ComplementaryFilter
 from .load_xml import _load_xml
@@ -126,10 +125,6 @@ class ReferenceEnv:
         self.data.qvel[:] = saved_qvel
         mujoco.mj_forward(self.model, self.data)
         self.comp_filter.reset()
-
-        # Match GnociGymEnv._get_obs per-dimension normalisation so AMP compares
-        # like-for-like.
-        dataset /= _OBS_NORM
 
         if self.frame_stack > 1:
             stacked = np.zeros((n_coarse, _OBS_DIM * self.frame_stack), dtype=np.float32)
