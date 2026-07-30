@@ -33,7 +33,7 @@ class Servo:
             self.kp, self.ki, self.kd,
             starting_output=0,
             setpoint=self.init_value,
-            output_limits=(-0.05, 0.05),  # max 5 units/tick = 5 units/sec at 100Hz
+            output_limits=(-0.2, 0.2),  # max 5 units/tick = 5 units/sec at 100Hz
             sample_time=1.0 / self.freq,
         )
         self.action_scale = self.max_delta_v / self.control_hz
