@@ -5,8 +5,9 @@ import os
 from collections import deque
 from .utils import tolerance
 from .load_xml import _load_xml
-from .filters import ComplementaryFilter, EMAFilter
-from .config import CONTROL_HZ
+from .filters import ComplementaryFilter
+from .config import CONTROL_HZ, FREQ
+from .servo import Servo
 import math
 
 _STANDING_HEIGHT = 0.23
@@ -93,6 +94,7 @@ class GnociGymEnv(gym.Env):
             camera='track',
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
+            servo_hz=FREQ,
             max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
@@ -132,7 +134,11 @@ class GnociGymEnv(gym.Env):
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
-        self.action_scale = max_joint_vel / control_hz
+        # Hardware (servo/PID) update rate, quantized to a whole number of
+        # physics substeps so `servo_dt` below is exact rather than nominal.
+        self.servo_update_every = max(1, int(round(1.0 / (servo_hz * PHYSICS_DT))))
+        self.servo_dt = self.servo_update_every * PHYSICS_DT
+        self.max_joint_vel = float(max_joint_vel)
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
@@ -162,7 +168,7 @@ class GnociGymEnv(gym.Env):
         self._randomize_dynamics()
         self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
-        self._sync_action_filters()
+        self._sync_servos()
         mujoco.mj_forward(self.model, self.data)
 
         self._push_step = 0
@@ -240,7 +246,18 @@ class GnociGymEnv(gym.Env):
         self._base_gravity_z = float(self.model.opt.gravity[2])
 
         self.comp_filter = ComplementaryFilter()
-        self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        self.servos = [
+            Servo(
+                name=name,
+                pin_limits=(float(lo) / np.pi, float(hi) / np.pi),
+                init_value=0.0,
+                control_hz=self.control_hz,
+                freq=1.0 / self.servo_dt,
+                max_delta_v=self.max_joint_vel,
+                action_filter_alpha=self.action_filter_alpha,
+            )
+            for name, (lo, hi) in zip(_JOINT_NAMES, self.joint_ranges)
+        ]
         self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
         self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
         self._foot_airtime = [0.0, 0.0]
@@ -300,9 +317,12 @@ class GnociGymEnv(gym.Env):
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
-    def _sync_action_filters(self):
-        for i, f in enumerate(self.action_filters):
-            f.value = 0.0
+    def _sync_servos(self):
+        # Snap each servo to the (possibly randomized) initial ctrl position
+        # rather than slewing there, since the sim world jumps straight to
+        # the reset pose.
+        for i, servo in enumerate(self.servos):
+            servo.reset(self.data.ctrl[i] / np.pi)
 
     def _randomize_joint_positions(self, randomness):
         for joint_id in range(self.model.njnt):
@@ -347,7 +367,7 @@ class GnociGymEnv(gym.Env):
         self._randomize_dynamics()
         self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
-        self._sync_action_filters()
+        self._sync_servos()
         mujoco.mj_forward(self.model, self.data)
         self.comp_filter.reset()
         self.done = False
@@ -617,11 +637,17 @@ class GnociGymEnv(gym.Env):
                 self._push_step = 0
                 self._push_interval = self._sample_push_interval()
 
+        # Set the control_hz setpoint from the policy action (servo internally
+        # scales by action_scale and low-pass filters the delta, as on hardware).
         for i in range(self.model.nu):
-            delta = self.action_filters[i].update(action[i]) * self.action_scale
-            lo, hi = self.joint_ranges[i]
-            self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
-        for _ in range(self.n_substeps):
+            self.servos[i].update_setpoint_delta(action[i])
+        # Step physics, advancing the slew-limited servo command toward the
+        # setpoint at the hardware rate (every `servo_update_every` substeps).
+        for k in range(self.n_substeps):
+            if k % self.servo_update_every == 0:
+                for i in range(self.model.nu):
+                    self.servos[i].get_pwm(dt=self.servo_dt)  # advances the PID/slew state
+                    self.data.ctrl[i] = self.servos[i].value * np.pi
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward, reward_components = self._get_reward()
