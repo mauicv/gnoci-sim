@@ -6,7 +6,7 @@ from collections import deque
 from .utils import tolerance
 from .load_xml import _load_xml
 from .filters import ComplementaryFilter, EMAFilter
-from .config import CONTROL_HZ
+from .config import CONTROL_HZ, HARDWARE_HZ
 import math
 
 _STANDING_HEIGHT = 0.23
@@ -93,6 +93,7 @@ class GnociGymEnv(gym.Env):
             camera='track',
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
+            hardware_hz=HARDWARE_HZ,
             max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
@@ -132,6 +133,9 @@ class GnociGymEnv(gym.Env):
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
+        self.hardware_hz = hardware_hz
+        self.n_hardware_substeps = int(round(1.0 / (hardware_hz * PHYSICS_DT)))
+        self.substeps_per_hardware_step = int(round(self.n_substeps / self.n_hardware_substeps))
         self.action_scale = max_joint_vel / control_hz
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
@@ -617,11 +621,17 @@ class GnociGymEnv(gym.Env):
                 self._push_step = 0
                 self._push_interval = self._sample_push_interval()
 
-        for i in range(self.model.nu):
-            delta = self.action_filters[i].update(action[i]) * self.action_scale
-            lo, hi = self.joint_ranges[i]
-            self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
-        for _ in range(self.n_substeps):
+        deltas = [
+            self.action_filters[i].update(action[i]) * self.action_scale
+            for i in range(self.model.nu)
+        ]
+        for j in range(self.n_substeps):
+            if (j % self.n_hardware_substeps) == 0:
+                for i in range(self.model.nu):
+                    lo, hi = self.joint_ranges[i]
+                    self.data.ctrl[i] = float(np.clip(
+                        self.data.ctrl[i] + (deltas[i] / self.substeps_per_hardware_step), lo, hi
+                    ))
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward, reward_components = self._get_reward()
