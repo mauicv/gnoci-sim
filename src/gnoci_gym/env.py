@@ -134,10 +134,15 @@ class GnociGymEnv(gym.Env):
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
-        # Hardware (servo/PID) update rate, quantized to a whole number of
-        # physics substeps so `servo_dt` below is exact rather than nominal.
+        # Hardware (servo) update rate, quantized to a whole number of physics
+        # substeps. `ticks_per_control_step` is the exact number of times the
+        # substep loop below will call get_pwm() per step() — Servo.freq must
+        # match this (not the nominal servo_hz) so its per-tick delta_rate
+        # (1 / (freq / control_hz)) distributes the action delta over exactly
+        # as many get_pwm() calls as actually happen before the next action.
         self.servo_update_every = max(1, int(round(1.0 / (servo_hz * PHYSICS_DT))))
-        self.servo_dt = self.servo_update_every * PHYSICS_DT
+        self.ticks_per_control_step = max(1, (self.n_substeps - 1) // self.servo_update_every + 1)
+        self.servo_freq = self.ticks_per_control_step * self.control_hz
         self.max_joint_vel = float(max_joint_vel)
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
@@ -252,9 +257,9 @@ class GnociGymEnv(gym.Env):
                 pin_limits=(float(lo) / np.pi, float(hi) / np.pi),
                 init_value=0.0,
                 control_hz=self.control_hz,
-                freq=1.0 / self.servo_dt,
+                freq=self.servo_freq,
                 max_delta_v=self.max_joint_vel,
-                action_filter_alpha=self.action_filter_alpha,
+                low_pass_filter_alpha=self.action_filter_alpha,
             )
             for name, (lo, hi) in zip(_JOINT_NAMES, self.joint_ranges)
         ]
@@ -637,16 +642,19 @@ class GnociGymEnv(gym.Env):
                 self._push_step = 0
                 self._push_interval = self._sample_push_interval()
 
-        # Set the control_hz setpoint from the policy action (servo internally
-        # scales by action_scale and low-pass filters the delta, as on hardware).
+        # Latch the control_hz action into each servo (internally scaled by
+        # action_scale and low-pass filtered, as on hardware). This resets the
+        # servo's tick counter so the resulting delta gets spread evenly over
+        # the hardware ticks below, rather than applied all at once.
         for i in range(self.model.nu):
             self.servos[i].update_setpoint_delta(action[i])
-        # Step physics, advancing the slew-limited servo command toward the
-        # setpoint at the hardware rate (every `servo_update_every` substeps).
+        # Step physics, applying 1/ticks_per_control_step of the latched delta
+        # at each hardware tick (every `servo_update_every` substeps) so the
+        # servo and hardware update rates move in lockstep.
         for k in range(self.n_substeps):
             if k % self.servo_update_every == 0:
                 for i in range(self.model.nu):
-                    self.servos[i].get_pwm(dt=self.servo_dt)  # advances the PID/slew state
+                    self.servos[i].get_pwm()
                     self.data.ctrl[i] = self.servos[i].value * np.pi
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
