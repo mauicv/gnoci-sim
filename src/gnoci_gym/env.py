@@ -41,14 +41,27 @@ MAX_JOINT_VEL = 10.0    # max joint angular velocity (rad/s) — scales action d
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
+# Sysid-derived per-joint dynamics — must stay equal to the frictionloss /
+# armature attributes on the named joints in desc/gnoci.xml. They have to be
+# threaded through here because _randomize_dynamics() stamps
+# dof_frictionloss/dof_armature on every reset, so the MJCF values alone
+# never survive past construction.
+SYSID_JOINT_FRICTIONLOSS = 0.0072408653310164755
+SYSID_JOINT_ARMATURE     = 0.014643797951585229
+
+# Hardware low-passes the accelerometer and joint velocities before building
+# the obs (gnoci-control sensors.py) — these alphas must match its values.
+ACC_FILTER_ALPHA       = 0.2
+JOINT_VEL_FILTER_ALPHA = 0.3
+
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
     inertial_mass_noise=0.0,
     floor_tilt_range=0.0,
     floor_friction_range=(1.0, 1.0),
-    joint_friction_range=(0.1, 0.1),
-    joint_armature_range=(0.005, 0.005),
+    joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
+    joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
     actuator_gain_range=(1.0, 1.0),
     gravity_noise=0.0,
     obs_noise_scale=0.0,
@@ -62,8 +75,10 @@ dom_rnd_cfg = dict(
     inertial_mass_noise=0.01,
     floor_tilt_range=0.02,
     floor_friction_range=(0.7, 1.3),
-    joint_friction_range=(0.07, 0.15),
-    joint_armature_range=(0.004, 0.008),
+    # same relative spread the old ranges had around their (pre-sysid)
+    # nominals: friction x0.7-1.5, armature x0.8-1.6
+    joint_friction_range=(0.7 * SYSID_JOINT_FRICTIONLOSS, 1.5 * SYSID_JOINT_FRICTIONLOSS),
+    joint_armature_range=(0.8 * SYSID_JOINT_ARMATURE, 1.6 * SYSID_JOINT_ARMATURE),
     actuator_gain_range=(0.9, 1.1),
     gravity_noise=0.1,
     obs_noise_scale=0.01,
@@ -99,8 +114,8 @@ class GnociGymEnv(gym.Env):
             inertial_mass_noise=0.03,
             floor_tilt_range=0.0,
             floor_friction_range=(1.0, 1.0),
-            joint_friction_range=(0.1, 0.1),
-            joint_armature_range=(0.005, 0.005),
+            joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
+            joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
             actuator_gain_range=(1.0, 1.0),
             gravity_noise=0.0,
             obs_noise_scale=0.0,
@@ -241,6 +256,8 @@ class GnociGymEnv(gym.Env):
 
         self.comp_filter = ComplementaryFilter()
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
+        self.acc_filters = [EMAFilter(alpha=ACC_FILTER_ALPHA) for _ in range(3)]
+        self.joint_vel_filters = [EMAFilter(alpha=JOINT_VEL_FILTER_ALPHA) for _ in range(_N_JOINTS)]
         self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
         self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
         self._foot_airtime = [0.0, 0.0]
@@ -350,6 +367,8 @@ class GnociGymEnv(gym.Env):
         self._sync_action_filters()
         mujoco.mj_forward(self.model, self.data)
         self.comp_filter.reset()
+        for f in self.acc_filters + self.joint_vel_filters:
+            f.reset()
         self.done = False
 
         self._push_step = 0
@@ -382,12 +401,17 @@ class GnociGymEnv(gym.Env):
         gyro, acc = self._get_imu_data()
         joint_pos = self._get_joint_positions() / np.pi
         joint_vel = self._get_joint_velocities()
+        # Hardware low-passes the accelerometer and joint velocities before
+        # building the obs, but feeds the complementary filter the *raw*
+        # accelerometer — mirror both, so pitch/roll below use unfiltered acc.
+        acc_filtered = [f.update(a) for f, a in zip(self.acc_filters, acc)]
+        joint_vel_filtered = [f.update(v) for f, v in zip(self.joint_vel_filters, joint_vel)]
         obs = np.array([
             *joint_pos,
-            *joint_vel,
+            *joint_vel_filtered,
             *self._get_contact_forces(),
             *gyro,
-            *acc,
+            *acc_filtered,
             *self._get_pitch_and_roll(gyro * 250, acc),
         ])
         if self.obs_noise_scale > 0:
