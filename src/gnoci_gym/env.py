@@ -6,7 +6,12 @@ from collections import deque
 from .utils import tolerance
 from .load_xml import _load_xml
 from .filters import ComplementaryFilter, EMAFilter
-from .config import CONTROL_HZ
+from .config import (
+    CONTROL_HZ,
+    MAX_JOINT_VEL,
+    ACC_FILTER_ALPHA,
+    JOINT_VEL_FILTER_ALPHA,
+)
 import math
 
 _STANDING_HEIGHT = 0.23
@@ -36,7 +41,6 @@ _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
-MAX_JOINT_VEL = 10.0    # max joint angular velocity (rad/s) — scales action deltas
 
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
@@ -48,11 +52,6 @@ IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 # never survive past construction.
 SYSID_JOINT_FRICTIONLOSS = 0.0072408653310164755
 SYSID_JOINT_ARMATURE     = 0.014643797951585229
-
-# Hardware low-passes the accelerometer and joint velocities before building
-# the obs (gnoci-control sensors.py) — these alphas must match its values.
-ACC_FILTER_ALPHA       = 0.2
-JOINT_VEL_FILTER_ALPHA = 0.3
 
 test_cfg = dict(
     initial_randomness=0.0,
@@ -256,8 +255,8 @@ class GnociGymEnv(gym.Env):
 
         self.comp_filter = ComplementaryFilter()
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
-        self.acc_filters = [EMAFilter(alpha=ACC_FILTER_ALPHA) for _ in range(3)]
-        self.joint_vel_filters = [EMAFilter(alpha=JOINT_VEL_FILTER_ALPHA) for _ in range(_N_JOINTS)]
+        self.acc_filters = [EMAFilter(alpha=ACC_FILTER_ALPHA, warm_start=True) for _ in range(3)]
+        self.joint_vel_filters = [EMAFilter(alpha=JOINT_VEL_FILTER_ALPHA, warm_start=True) for _ in range(_N_JOINTS)]
         self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
         self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
         self._foot_airtime = [0.0, 0.0]
