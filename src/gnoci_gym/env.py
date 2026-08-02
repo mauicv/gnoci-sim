@@ -53,6 +53,40 @@ IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 SYSID_JOINT_FRICTIONLOSS = 0.0072408653310164755
 SYSID_JOINT_ARMATURE     = 0.014643797951585229
 
+# Per-sensor observation noise scales, in raw sensor units (rad, rad/s, m/s²).
+# Sampled uniform(-scale, scale) and converted into obs units with the same
+# transforms _get_obs applies before being added to the obs.
+OBS_NOISE_SCALES = dict(
+    hip_pos=0.03,   # rad, for each hip joint
+    knee_pos=0.05,  # rad, for each knee joint
+    ankle_pos=0.08, # rad, for each ankle joint
+    joint_vel=2.5,  # rad/s # Was 1.5
+    gravity=0.1,    # rad, applied to the pitch/roll estimate
+    linvel=0.1,     # unused: no linvel in the obs
+    gyro=0.1,       # rad/s
+    accelerometer=0.05,  # m/s²
+)
+
+
+def _build_obs_noise_vec(scales):
+    joint_pos = []
+    for name in _JOINT_NAMES:
+        if 'lower_leg__foot' in name:
+            s = scales['ankle_pos']
+        elif 'upper_leg__lower_leg' in name:
+            s = scales['knee_pos']
+        else:
+            s = scales['hip_pos']
+        joint_pos.append(s / np.pi)  # obs joint pos are rad / pi
+    return np.concatenate([
+        joint_pos,
+        np.full(_N_JOINTS, scales['joint_vel']),                # obs vel is raw rad/s
+        np.zeros(_N_TOUCH),                                     # binary contacts stay clean
+        np.full(3, scales['gyro'] * IMU_GYRO_SCALE),
+        np.full(3, scales['accelerometer'] / IMU_ACC_SCALE),
+        np.full(2, scales['gravity']),                          # pitch/roll in rad
+    ])
+
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
@@ -63,7 +97,7 @@ test_cfg = dict(
     joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
     actuator_gain_range=(1.0, 1.0),
     gravity_noise=0.0,
-    obs_noise_scale=0.0,
+    obs_noise_level=0.0,
     push_force_max=0.0,
     max_action_delay=0,
 )
@@ -80,7 +114,7 @@ dom_rnd_cfg = dict(
     joint_armature_range=(0.8 * SYSID_JOINT_ARMATURE, 1.6 * SYSID_JOINT_ARMATURE),
     actuator_gain_range=(0.9, 1.1),
     gravity_noise=0.1,
-    obs_noise_scale=0.01,
+    obs_noise_level=1.0,
     push_force_max=1.0,
     push_interval_range=(3.0, 6.0),
     max_action_delay=1,
@@ -92,6 +126,8 @@ class GnociGymEnv(gym.Env):
 
     DEFAULT_REWARD_COEFS = {
         'stand':         1.0,
+        'both_feet':     0.5,
+        'default_pose':  0.5,
         'velocity':      2.5,
         'foot_contact':  0.75,
         'foot_airtime':  0.5,
@@ -117,7 +153,8 @@ class GnociGymEnv(gym.Env):
             joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
             actuator_gain_range=(1.0, 1.0),
             gravity_noise=0.0,
-            obs_noise_scale=0.0,
+            obs_noise_level=0.0,
+            obs_noise_scales=None,
             push_force_max=0.0,
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
@@ -156,7 +193,9 @@ class GnociGymEnv(gym.Env):
         self.joint_armature_range = joint_armature_range
         self.actuator_gain_range = actuator_gain_range
         self.gravity_noise = gravity_noise
-        self.obs_noise_scale = obs_noise_scale
+        self.obs_noise_level = obs_noise_level
+        self.obs_noise_scales = {**OBS_NOISE_SCALES, **(obs_noise_scales or {})}
+        self._obs_noise_vec = _build_obs_noise_vec(self.obs_noise_scales)
         self.push_force_max = push_force_max
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
@@ -413,8 +452,9 @@ class GnociGymEnv(gym.Env):
             *acc_filtered,
             *self._get_pitch_and_roll(gyro * 250, acc),
         ])
-        if self.obs_noise_scale > 0:
-            noisey_obs = obs + np.random.normal(0, self.obs_noise_scale, obs.shape)
+        if self.obs_noise_level > 0:
+            noise = np.random.uniform(-1, 1, obs.shape) * self._obs_noise_vec
+            noisey_obs = obs + self.obs_noise_level * noise
         else:
             noisey_obs = obs
         return noisey_obs.astype(np.float32), obs.astype(np.float32)
@@ -567,6 +607,20 @@ class GnociGymEnv(gym.Env):
         self._contact_buffer.append(single)
         return 1.0 if any(self._contact_buffer) else 0.0
 
+    def _get_both_feet_contact_reward(self):
+        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        left  = contacts[0] > 0 or contacts[1] > 0
+        right = contacts[2] > 0 or contacts[3] > 0
+        return 1.0 if (left and right) else 0.0
+
+    def _get_default_pose_reward(self):
+        # Every joint's default is 0.0 (see _set_joint_positions).
+        positions = self._get_joint_positions()
+        return float(np.mean([
+            tolerance(float(p), bounds=(0.0, 0.0), margin=0.3)
+            for p in positions
+        ]))
+
     def _get_reward(self):
         c = self.reward_coefs
         stand_gate = self._get_stand_gate()
@@ -618,8 +672,27 @@ class GnociGymEnv(gym.Env):
             })
             return reward, components
 
-        reward = c['stand'] * stand_gate
-        components['stand'] = reward
+        both_feet_reward    = self._get_both_feet_contact_reward()
+        default_pose_reward = self._get_default_pose_reward()
+        fall_term = -c['fall'] * (1.0 - stand_gate)
+        # Contact and pose shaping are gated by posture quality so a fallen
+        # robot whose feet still graze the floor earns nothing from them.
+        reward = (
+            c['stand'] * stand_gate
+            + stand_gate * (
+                c['both_feet']      * both_feet_reward
+                + c['default_pose'] * default_pose_reward
+            )
+            + self.survival_bonus
+            + fall_term
+        )
+        components.update({
+            'stand':          c['stand'] * stand_gate,
+            'both_feet':      stand_gate * c['both_feet']    * both_feet_reward,
+            'default_pose':   stand_gate * c['default_pose'] * default_pose_reward,
+            'survival_bonus': self.survival_bonus,
+            'fall':           fall_term,
+        })
         return reward, components
 
     def step(self, action):
