@@ -135,7 +135,8 @@ class GnociGymEnv(gym.Env):
         'fall':          0.5,
         'orientation':   0.1,
         'heading':       0.3,
-        'yoke_joint':    0.1,
+        'yoke_joint':    0.0,
+        'yoke_symmetry': 0.1,
     }
 
     def __init__(
@@ -589,6 +590,17 @@ class GnociGymEnv(gym.Env):
             for i in yoke_indices
         ]))
 
+    def _get_yoke_symmetry_reward(self):
+        # Encourage the yoke joints to mirror left/right without pulling them
+        # toward 0: head__left_yoke ~ head__right_yoke and left_yoke__hip ~
+        # right_yoke__hip. The left joint axes are -z and the right +z in the
+        # MJCF, so a mirrored posture means *equal* joint values.
+        positions = self._get_joint_positions()
+        return float(np.mean([
+            tolerance(float(positions[l] - positions[r]), bounds=(0.0, 0.0), margin=0.2)
+            for l, r in ((0, 5), (1, 6))  # (head__yoke, yoke__hip) pairs
+        ]))
+
     def _get_heading_reward(self):
         xmat = self.data.xmat[self.body_id]
         # Body forward direction in world XY plane (-Y body axis, rewarded motion is -Y world)
@@ -634,6 +646,7 @@ class GnociGymEnv(gym.Env):
             orientation_reward   = self._get_orientation_reward()
             heading_reward       = self._get_heading_reward()
             yoke_joint_reward    = self._get_yoke_joint_reward()
+            yoke_symmetry_reward = self._get_yoke_symmetry_reward()
 
             # Motion-only locomotion terms. velocity/airtime/clearance are ~0
             # while still; foot_contact only pays on single-foot support.
@@ -648,7 +661,8 @@ class GnociGymEnv(gym.Env):
             posture = velocity_reward * (
                 c['orientation'] * orientation_reward
                 + c['heading']   * heading_reward
-                + c['yoke_joint'] * yoke_joint_reward
+                + c['yoke_joint']    * yoke_joint_reward
+                + c['yoke_symmetry'] * yoke_symmetry_reward
             )
             fall_term = -c['fall'] * (1.0 - stand_gate)
             # The shaped reward is gated by posture quality (so falling throttles
@@ -666,7 +680,8 @@ class GnociGymEnv(gym.Env):
                 'foot_clearance': stand_gate * c['foot_clearance'] * foot_clearance_reward,
                 'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
                 'heading':        stand_gate * velocity_reward * c['heading']    * heading_reward,
-                'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint'] * yoke_joint_reward,
+                'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint']    * yoke_joint_reward,
+                'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,
                 'survival_bonus': self.survival_bonus,
                 'fall':           fall_term,
             })
