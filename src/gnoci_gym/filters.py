@@ -62,6 +62,34 @@ class ComplementaryFilter:
         return self.g_x, self.g_y
 
 
+class Debouncer:
+    """Binary-signal debouncer: the output only flips after the raw input has
+    held the opposite value for `n` consecutive updates, suppressing shorter
+    flickers.  The first sample after a reset seeds the state directly, so an
+    episode that starts with feet on the ground reads contact immediately."""
+
+    def __init__(self, n):
+        self.n = n
+        self.reset()
+
+    def reset(self):
+        self.state = None
+        self._count = 0
+
+    def update(self, raw):
+        raw = bool(raw)
+        if self.state is None:
+            self.state = raw
+        if raw == self.state:
+            self._count = 0
+        else:
+            self._count += 1
+            if self._count >= self.n:
+                self.state = raw
+                self._count = 0
+        return self.state
+
+
 class EMAFilter:
     def __init__(self, alpha=0.4, warm_start=False):
         # warm_start seeds the filter with the first sample after a reset

@@ -5,7 +5,7 @@ import os
 from collections import deque
 from .utils import tolerance
 from .load_xml import _load_xml
-from .filters import ComplementaryFilter, EMAFilter
+from .filters import ComplementaryFilter, EMAFilter, Debouncer
 from .config import (
     CONTROL_HZ,
     MAX_JOINT_VEL,
@@ -41,6 +41,12 @@ _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
+_CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist this long to register
+# Hysteresis thresholds (N) mimicking the limit switches' actuation/release
+# forces: contact turns on above ON, off below OFF.  Standing loads are
+# ~2.7 N on the lightest (front) sites, so ON stays well below stance forces.
+_CONTACT_FORCE_ON  = 1.0
+_CONTACT_FORCE_OFF = 0.5
 
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
@@ -262,13 +268,14 @@ class GnociGymEnv(gym.Env):
         except KeyError:
             self.floor_geom_id = -1
             self.floor_z = 0.0
-        _ground_term_bodies = ["head_base", "left_hip_back", "right_hip_back"]
-        self._ground_termination_geoms = set()
-        for bname in _ground_term_bodies:
-            bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, bname)
-            gs = self.model.body_geomadr[bid]
-            gc = self.model.body_geomnum[bid]
-            self._ground_termination_geoms.update(range(gs, gs + gc))
+        # Episode ends when any of these geom centres passes below the floor
+        # plane; the feet and world geoms (floor) are excluded.
+        foot_body_ids = {self.left_foot_body_id, self.right_foot_body_id}
+        self._ground_termination_geoms = np.array([
+            g for g in range(self.model.ngeom)
+            if self.model.geom_bodyid[g] != 0
+            and self.model.geom_bodyid[g] not in foot_body_ids
+        ])
         self.joint_qpos_addrs = [
             self.model.jnt_qposadr[self.model.joint(j).id]
             for j in _JOINT_NAMES
@@ -299,6 +306,9 @@ class GnociGymEnv(gym.Env):
         self.joint_vel_filters = [EMAFilter(alpha=JOINT_VEL_FILTER_ALPHA, warm_start=True) for _ in range(_N_JOINTS)]
         self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
         self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
+        self._debounce_steps = max(1, int(_CONTACT_DEBOUNCE_PERIOD * self.control_hz))
+        self.contact_debouncers = [Debouncer(self._debounce_steps) for _ in range(_N_TOUCH)]
+        self._contact_states = np.zeros(_N_TOUCH, dtype=np.float32)
         self._foot_airtime = [0.0, 0.0]
         self._foot_was_contact = [False, False]
 
@@ -414,6 +424,8 @@ class GnociGymEnv(gym.Env):
         self._push_interval = self._sample_push_interval()
 
         self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
+        for d in self.contact_debouncers:
+            d.reset()
         self._foot_airtime = [0.0, 0.0]
         self._foot_was_contact = [False, False]
 
@@ -433,10 +445,22 @@ class GnociGymEnv(gym.Env):
     def _get_joint_velocities(self):
         return self.data.qvel[self.joint_dof_addrs]
 
+    def _update_contact_states(self):
+        """Threshold (with hysteresis) and debounce the touch readings; called
+        once per control step (from _get_obs).  All contact consumers read the
+        cached result."""
+        forces = self.data.sensordata[self.touch_sensor_addrs]
+        states = []
+        for d, f in zip(self.contact_debouncers, forces):
+            threshold = _CONTACT_FORCE_OFF if d.state else _CONTACT_FORCE_ON
+            states.append(d.update(f > threshold))
+        self._contact_states = np.array(states, dtype=np.float32)
+
     def _get_contact_forces(self):
-        return (self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32)
+        return self._contact_states
 
     def _get_obs(self):
+        self._update_contact_states()
         gyro, acc = self._get_imu_data()
         joint_pos = self._get_joint_positions() / np.pi
         joint_vel = self._get_joint_velocities()
@@ -463,18 +487,18 @@ class GnociGymEnv(gym.Env):
     def _get_info(self):
         return {}
 
-    def overturned(self):
-        return self._get_root_upright() < 0.3
+    def _body_below_floor(self):
+        """True when any non-foot geom centre passes below the floor plane.
 
-    def _root_body_on_ground(self):
+        Uses the floor's live position and normal so it stays correct under
+        the tilted-floor randomization.
+        """
         if self.floor_geom_id == -1:
             return False
-        for i in range(self.data.ncon):
-            c = self.data.contact[i]
-            if (c.geom1 == self.floor_geom_id and c.geom2 in self._ground_termination_geoms) or \
-               (c.geom2 == self.floor_geom_id and c.geom1 in self._ground_termination_geoms):
-                return True
-        return False
+        normal = self.data.geom_xmat[self.floor_geom_id].reshape(3, 3)[:, 2]
+        offsets = self.data.geom_xpos[self._ground_termination_geoms] \
+            - self.data.geom_xpos[self.floor_geom_id]
+        return bool((offsets @ normal < 0.0).any())
 
     def _get_root_upright(self):
         xmat = self.data.xmat[self.body_id]
@@ -507,7 +531,7 @@ class GnociGymEnv(gym.Env):
 
     def _get_foot_airtime_reward(self):
         dt = 1.0 / self.control_hz
-        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        contacts = self._contact_states
         current = [
             contacts[0] > 0 or contacts[1] > 0,  # left foot
             contacts[2] > 0 or contacts[3] > 0,  # right foot
@@ -612,7 +636,7 @@ class GnociGymEnv(gym.Env):
         return float((np.dot(body_forward, [0.0, -1.0]) + 1.0) / 2.0)
 
     def _get_foot_contact_reward(self):
-        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        contacts = self._contact_states
         left  = contacts[0] > 0 or contacts[1] > 0
         right = contacts[2] > 0 or contacts[3] > 0
         single = left ^ right
@@ -620,7 +644,7 @@ class GnociGymEnv(gym.Env):
         return 1.0 if any(self._contact_buffer) else 0.0
 
     def _get_both_feet_contact_reward(self):
-        contacts = self.data.sensordata[self.touch_sensor_addrs]
+        contacts = self._contact_states
         left  = contacts[0] > 0 or contacts[1] > 0
         right = contacts[2] > 0 or contacts[3] > 0
         return 1.0 if (left and right) else 0.0
@@ -736,7 +760,7 @@ class GnociGymEnv(gym.Env):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward, reward_components = self._get_reward()
-        if self.overturned() or self._root_body_on_ground():
+        if self._body_below_floor():
             self.done = True
         return (noisey_state, reward, self.done, self.done, {'state': state, 'reward_components': reward_components})
 

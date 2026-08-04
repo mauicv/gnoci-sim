@@ -74,6 +74,35 @@ LEFT_JOINTS = {
     "left_lower_leg__foot",
 }
 
+# Foot contact spheres: one per corner of the sole's flat bottom rectangle,
+# positioned in the foot body's local frame.  Initial values were measured
+# from the sole meshes at the default pose (edges flush with the mesh
+# footprint, bottoms level with the sole); adjust after visualising.
+FOOT_SPHERE_RADIUS = 0.006  # metres
+
+# Contact softness, tuned against chatter (make/break flicker and touch-force
+# jitter) over seeded random-action rollouts.  solref = (timeconst, dampratio):
+# dampratio 2 = overdamped, no touchdown rebound.  solimp width 6 mm so force
+# builds gradually with penetration instead of switching on/off within the
+# default 1 mm.  Static penetration ~2 mm when standing.
+FOOT_SPHERE_SOLREF = "0.03 2"
+FOOT_SPHERE_SOLIMP = "0.9 0.95 0.006 0.5 2"
+
+FOOT_SPHERES: dict[str, dict[str, str]] = {
+    "left_foot_base": {
+        "left_foot_front_inner_sphere": "-0.03810816 -0.04916554 0.01000100",
+        "left_foot_back_inner_sphere":  "0.03810813 -0.04916554 0.01000100",
+        "left_foot_front_outer_sphere": "-0.03810816 -0.04916554 0.05200101",
+        "left_foot_back_outer_sphere":  "0.03810813 -0.04916554 0.05200101",
+    },
+    "right_foot_base": {
+        "right_foot_front_outer_sphere": "-0.03810816 0.04916554 0.05159901",
+        "right_foot_back_outer_sphere":  "0.03810813 0.04916554 0.05159901",
+        "right_foot_front_inner_sphere": "-0.03810816 0.04916554 0.00959900",
+        "right_foot_back_inner_sphere":  "0.03810813 0.04916554 0.00959900",
+    },
+}
+
 # Touch sensor site size (metres).  Sites sit ~0.035 m above the floor contact
 # surface; 0.04 m radius reaches the floor (0.035 m away) but not the opposite
 # site (~0.063 m away), giving clean front/back separation.
@@ -258,6 +287,14 @@ def process(src, dst):
                 body.remove(geom)
                 removed += 1
 
+    # ── disable all mesh contacts ────────────────────────────────────────────
+    # Contacts happen only between the floor and the foot corner spheres
+    # added by _add_foot_spheres below.
+    for geom in root.iter("geom"):
+        if geom.get("class") == "collision":
+            geom.set("contype", "0")
+            geom.set("conaffinity", "0")
+
     # ── remove explicit inertials (let MuJoCo compute from geom masses) ─────
     for body in root.iter("body"):
         for inertial in list(body.findall("inertial")):
@@ -294,6 +331,26 @@ def process(src, dst):
             joint.set(attr, str(value))
         joints_tuned += 1
 
+    # ── foot corner contact spheres ──────────────────────────────────────────
+    # contype=2 conaffinity=1: collide with the floor (default mask,
+    # contype=1) but not with each other or the robot.
+    sphere_names = []
+    for body in root.iter("body"):
+        for name, pos in FOOT_SPHERES.get(body.get("name"), {}).items():
+            gel = ET.SubElement(body, "geom")
+            gel.set("name", name)
+            gel.set("type", "sphere")
+            gel.set("size", str(FOOT_SPHERE_RADIUS))
+            gel.set("pos", pos)
+            gel.set("solref", FOOT_SPHERE_SOLREF)
+            gel.set("solimp", FOOT_SPHERE_SOLIMP)
+            gel.set("priority", "1")   # sphere solref/solimp win over the floor's
+            gel.set("group", "3")
+            gel.set("contype", "2")
+            gel.set("conaffinity", "1")
+            gel.set("mass", "0")
+            sphere_names.append(name)
+
     # ── write output ──────────────────────────────────────────────────────────
     _indent(root)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -303,6 +360,7 @@ def process(src, dst):
     print(f"  Joints ({len(joints_instrumented)}): {', '.join(joints_instrumented)}")
     print(f"  Collision geoms removed: {removed}")
     print(f"  Geom masses assigned:   {masses_set}")
+    print(f"  Foot contact spheres:   {len(sphere_names)} (all mesh contacts disabled)")
     print(f"  Touch sensors added:    {len(c_sense_sites)} ({', '.join(c_sense_sites)})")
 
 

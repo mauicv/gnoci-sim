@@ -49,14 +49,14 @@ root_uprights = []
 for i in tqdm(range(100)):
 
     # action = np.random.uniform(-1, 1, env.action_space.shape[0])
-    # action = np.random.randn(env.action_space.shape[0], 1) * 1
-    action = np.zeros(env.action_space.shape[0])
-    action[2] = 1
-    action[5+2] = 1
-    action[4] = 1
-    action[9] = 1
-    action[3] = 1
-    action[8] = 1
+    action = np.random.randn(env.action_space.shape[0], 1) * 1
+    # action = np.zeros(env.action_space.shape[0])
+    # action[2] = 1
+    # action[5+2] = 1
+    # action[4] = 1
+    # action[9] = 1
+    # action[3] = 1
+    # action[8] = 1
 
     # action = np.zeros(env.action_space.shape[0])
     # action = np.ones(env.action_space.shape[0])
@@ -70,7 +70,7 @@ for i in tqdm(range(100)):
     
     times.append(env.unwrapped.data.time)
     dones.append(int(done))
-    touching_floor.append(int(env.unwrapped._root_body_on_ground()))
+    touching_floor.append(int(env.unwrapped._body_below_floor()))
 
     # actions.append(action)
     # control.append(env.unwrapped.data.ctrl.copy())
@@ -82,7 +82,7 @@ plt.plot(times, rewards)
 plt.plot(times, touching_floor)
 # plt.plot(times, root_uprights)
 # plt.plot(times, rewards)
-# plt.plot(times, dones)
+plt.plot(times, dones)
 # plt.plot(times, contacts)
 plt.show()
 
