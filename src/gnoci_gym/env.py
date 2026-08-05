@@ -143,6 +143,7 @@ class GnociGymEnv(gym.Env):
         'heading':       0.3,
         'yoke_joint':    0.0,
         'yoke_symmetry': 0.1,
+        'action_magnitude': 0.05,
     }
 
     def __init__(
@@ -229,6 +230,7 @@ class GnociGymEnv(gym.Env):
         self._push_interval = self._sample_push_interval()
         self._action_delay = 0
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
+        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
     def _build_model(self):
         """One-time model compile + cache. Not called on reset() — only the
@@ -428,6 +430,7 @@ class GnociGymEnv(gym.Env):
             d.reset()
         self._foot_airtime = [0.0, 0.0]
         self._foot_was_contact = [False, False]
+        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)
@@ -649,6 +652,12 @@ class GnociGymEnv(gym.Env):
         right = contacts[2] > 0 or contacts[3] > 0
         return 1.0 if (left and right) else 0.0
 
+    def _get_action_magnitude_reward(self):
+        # Mean squared action command, in [0, 1] since actions are clipped to
+        # [-1, 1]. Penalising this discourages large/jerky commands (energy
+        # use, servo wear) independent of task performance.
+        return float(np.mean(np.square(self._last_action)))
+
     def _get_default_pose_reward(self):
         # Every joint's default is 0.0 (see _set_joint_positions).
         positions = self._get_joint_positions()
@@ -671,6 +680,7 @@ class GnociGymEnv(gym.Env):
             heading_reward       = self._get_heading_reward()
             yoke_joint_reward    = self._get_yoke_joint_reward()
             yoke_symmetry_reward = self._get_yoke_symmetry_reward()
+            action_magnitude_reward = self._get_action_magnitude_reward()
 
             # Motion-only locomotion terms. velocity/airtime/clearance are ~0
             # while still; foot_contact only pays on single-foot support.
@@ -689,10 +699,18 @@ class GnociGymEnv(gym.Env):
                 + c['yoke_symmetry'] * yoke_symmetry_reward
             )
             fall_term = -c['fall'] * (1.0 - stand_gate)
+            # Ungated: penalise large/jerky commands regardless of posture, so
+            # the signal survives even while falling.
+            action_magnitude_term = -c['action_magnitude'] * action_magnitude_reward
             # The shaped reward is gated by posture quality (so falling throttles
             # it toward 0). The only thing payable while still is the decaying
             # survival_bonus; falling is penalised rather than rewarded.
-            reward = stand_gate * (locomotion + posture) + self.survival_bonus + fall_term
+            reward = (
+                stand_gate * (locomotion + posture)
+                + self.survival_bonus
+                + fall_term
+                + action_magnitude_term
+            )
 
             # Each value here is the final, weighted/gated contribution to
             # `reward` (not the raw [0, 1] signal) — they sum exactly to the
@@ -708,14 +726,18 @@ class GnociGymEnv(gym.Env):
                 'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,
                 'survival_bonus': self.survival_bonus,
                 'fall':           fall_term,
+                'action_magnitude': action_magnitude_term,
             })
             return reward, components
 
         both_feet_reward    = self._get_both_feet_contact_reward()
         default_pose_reward = self._get_default_pose_reward()
+        action_magnitude_reward = self._get_action_magnitude_reward()
         fall_term = -c['fall'] * (1.0 - stand_gate)
+        action_magnitude_term = -c['action_magnitude'] * action_magnitude_reward
         # Contact and pose shaping are gated by posture quality so a fallen
         # robot whose feet still graze the floor earns nothing from them.
+        # The action-magnitude penalty stays ungated, same reasoning as fall_term.
         reward = (
             c['stand'] * stand_gate
             + stand_gate * (
@@ -724,6 +746,7 @@ class GnociGymEnv(gym.Env):
             )
             + self.survival_bonus
             + fall_term
+            + action_magnitude_term
         )
         components.update({
             'stand':          c['stand'] * stand_gate,
@@ -731,6 +754,7 @@ class GnociGymEnv(gym.Env):
             'default_pose':   stand_gate * c['default_pose'] * default_pose_reward,
             'survival_bonus': self.survival_bonus,
             'fall':           fall_term,
+            'action_magnitude': action_magnitude_term,
         })
         return reward, components
 
@@ -740,6 +764,8 @@ class GnociGymEnv(gym.Env):
         if self.max_action_delay > 0:
             self._action_buffer.append(action.copy())
             action = self._action_buffer[0]
+
+        self._last_action = action
 
         if self.push_force_max > 0:
             self.data.xfrc_applied[self.body_id] = 0
