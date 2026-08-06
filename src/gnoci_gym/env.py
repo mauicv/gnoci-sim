@@ -230,7 +230,7 @@ class GnociGymEnv(gym.Env):
         self._push_interval = self._sample_push_interval()
         self._action_delay = 0
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
-        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
     def _build_model(self):
         """One-time model compile + cache. Not called on reset() — only the
@@ -430,7 +430,7 @@ class GnociGymEnv(gym.Env):
             d.reset()
         self._foot_airtime = [0.0, 0.0]
         self._foot_was_contact = [False, False]
-        self._last_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)
@@ -653,10 +653,11 @@ class GnociGymEnv(gym.Env):
         return 1.0 if (left and right) else 0.0
 
     def _get_action_magnitude_reward(self):
-        # Mean squared action command, in [0, 1] since actions are clipped to
-        # [-1, 1]. Penalising this discourages large/jerky commands (energy
-        # use, servo wear) independent of task performance.
-        return float(np.mean(np.square(self._last_action)))
+        # Mean squared *raw* (pre-clip) action. Using the unclipped value
+        # means a policy that saturates keeps getting corrective gradient —
+        # clip() has zero derivative outside [-1, 1], so penalising the
+        # clipped action can't push an already-saturating policy back down.
+        return float(np.mean(np.square(self._last_raw_action)))
 
     def _get_default_pose_reward(self):
         # Every joint's default is 0.0 (see _set_joint_positions).
@@ -759,13 +760,12 @@ class GnociGymEnv(gym.Env):
         return reward, components
 
     def step(self, action):
+        self._last_raw_action = np.asarray(action, dtype=np.float32)
         action = action.clip(-1, 1)
 
         if self.max_action_delay > 0:
             self._action_buffer.append(action.copy())
             action = self._action_buffer[0]
-
-        self._last_action = action
 
         if self.push_force_max > 0:
             self.data.xfrc_applied[self.body_id] = 0
