@@ -8,7 +8,6 @@ from .load_xml import _load_xml
 from .filters import ComplementaryFilter, EMAFilter, Debouncer
 from .config import (
     CONTROL_HZ,
-    MAX_JOINT_VEL,
     ACC_FILTER_ALPHA,
     JOINT_VEL_FILTER_ALPHA,
 )
@@ -151,7 +150,6 @@ class GnociGymEnv(gym.Env):
             camera='track',
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
-            max_joint_vel=MAX_JOINT_VEL,
             initial_randomness=0.1,
             inertial_mass_range=(0.04, 0.06),
             inertial_mass_noise=0.03,
@@ -167,6 +165,7 @@ class GnociGymEnv(gym.Env):
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
             action_filter_alpha=0.4,
+            action_scale=0.25,
             task='stand',
             reward_coefs=None,
             fix_root_body=False,
@@ -191,7 +190,6 @@ class GnociGymEnv(gym.Env):
         self.done = False
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
-        self.action_scale = max_joint_vel / control_hz
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
         self.inertial_mass_noise = inertial_mass_noise
@@ -208,6 +206,7 @@ class GnociGymEnv(gym.Env):
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
         self.action_filter_alpha = action_filter_alpha
+        self.action_scale = action_scale
         self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
@@ -779,9 +778,14 @@ class GnociGymEnv(gym.Env):
                 self._push_interval = self._sample_push_interval()
 
         for i in range(self.model.nu):
-            delta = self.action_filters[i].update(action[i]) * self.action_scale
+            # Absolute position control: action in [-1, 1] scales to a target
+            # offset (in radians) from the joint's default pose (qpos == 0,
+            # see _set_joint_positions), then clips to the joint's range as a
+            # safety bound rather than an amplitude the policy is meant to hit.
+            filtered = self.action_filters[i].update(action[i])
             lo, hi = self.joint_ranges[i]
-            self.data.ctrl[i] = float(np.clip(self.data.ctrl[i] + delta, lo, hi))
+            target = self.action_scale * filtered
+            self.data.ctrl[i] = float(np.clip(target, lo, hi))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()

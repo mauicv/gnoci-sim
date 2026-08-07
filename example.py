@@ -14,7 +14,6 @@ import sys
 #     "inertial_mass_noise": 0.0,
 #     "action_filter_alpha": 0.0,
 #     "control_hz": 40,
-#     "max_joint_vel": 6.0,
 # }
 
 # env = GnociGymEnv(**kwargs)
@@ -26,7 +25,6 @@ env = GnociGymEnv(
     # floor_tilt_range=0.0,
     action_filter_alpha=1,
     control_hz=40,
-    max_joint_vel=3,
 )
 
 state, *_ = env.reset(seed=0)
