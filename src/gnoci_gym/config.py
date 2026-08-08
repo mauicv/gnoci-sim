@@ -3,5 +3,3 @@ CONTROL_HZ = 60
 # the obs (gnoci-control sensors.py) — these alphas must match its values.
 ACC_FILTER_ALPHA       = 1
 JOINT_VEL_FILTER_ALPHA = 1
-
-MAX_JOINT_VEL = 6.0    # max joint angular velocity (rad/s) — scales action deltas
