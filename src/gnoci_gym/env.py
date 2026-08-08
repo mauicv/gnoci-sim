@@ -139,7 +139,7 @@ class GnociGymEnv(gym.Env):
         'foot_clearance': 0.5,
         'fall':          0.5,
         'orientation':   0.1,
-        'heading':       0.3,
+        'rotation':      0.5,
         'yoke_joint':    0.0,
         'yoke_symmetry': 0.1,
         'action_magnitude': 0.05,
@@ -537,6 +537,16 @@ class GnociGymEnv(gym.Env):
     def _get_velocity(self):
         return self.data.cvel[self.body_id][3:6]
 
+    def _get_yaw_rate(self):
+        # Raw gyro sensordata in rad/s, permuted into the hardware axis
+        # convention (see permute_imu_data). Index 2 is the axis the
+        # complementary filter deliberately ignores for pitch/roll (see
+        # ComplementaryFilter.update's `x_gyro, y_gyro, _ = gyro_data`) —
+        # i.e. yaw rate, which is directly measurable on real hardware unlike
+        # world-frame lateral drift.
+        gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
+        return float(self.permute_imu_data(gyro)[2])
+
     def _get_foot_airtime_reward(self):
         dt = 1.0 / self.control_hz
         contacts = self._contact_states
@@ -571,9 +581,10 @@ class GnociGymEnv(gym.Env):
 
     def _get_velocity_reward(self):
         velocity = self._get_velocity()
-        side_v = abs(velocity[0])
-        lateral_penalty = max(1.0 - 2.0 * side_v, 0.0)
-        forward = -velocity[1]  # rewarded direction is -Y world
+        # Forward speed along the robot's own body-forward axis, not a fixed
+        # global direction — so turning to walk a curve/heading still earns
+        # forward credit, rather than only ever crediting motion toward -Y.
+        forward = float(np.dot(velocity[:2], self._get_body_forward_xy()))
         target = self.target_velocity
         if forward <= 0.0 or target <= 0.0:
             # Exactly zero at (or below) zero forward speed — no deadband leak,
@@ -589,7 +600,15 @@ class GnociGymEnv(gym.Env):
                 bounds=(target, target + self.target_velocity_band),
                 margin=target,
             )
-        return forward_reward * lateral_penalty
+        return forward_reward
+
+    def _get_rotation_penalty_reward(self):
+        # Squared yaw rate (rad/s) — same gyro axis the complementary filter
+        # ignores for pitch/roll, so it's measurable on real hardware unlike
+        # world-frame lateral drift (see _get_yaw_rate). A separate ungated
+        # term rather than a gate on forward velocity, so spinning is always
+        # penalised on its own terms instead of just zeroing out forward credit.
+        return float(np.square(self._get_yaw_rate()))
 
     def _get_foot_clearance_reward(self):
         """Reward committing to a step: credit the height difference between the
@@ -633,15 +652,16 @@ class GnociGymEnv(gym.Env):
             for l, r in ((0, 5), (1, 6))  # (head__yoke, yoke__hip) pairs
         ]))
 
-    def _get_heading_reward(self):
+    def _get_body_forward_xy(self):
+        """Unit body-forward direction (-Y body axis) projected into the world
+        XY plane. Zero vector when the body is on its side (axis has no XY
+        component)."""
         xmat = self.data.xmat[self.body_id]
-        # Body forward direction in world XY plane (-Y body axis, rewarded motion is -Y world)
         body_forward = np.array([-xmat[3], -xmat[4]])
-        body_forward_norm = np.linalg.norm(body_forward)
-        if body_forward_norm < 1e-6:
-            return 0.0
-        body_forward = body_forward / body_forward_norm
-        return float((np.dot(body_forward, [0.0, -1.0]) + 1.0) / 2.0)
+        norm = np.linalg.norm(body_forward)
+        if norm < 1e-6:
+            return np.zeros(2)
+        return body_forward / norm
 
     def _get_foot_contact_reward(self):
         contacts = self._contact_states
@@ -700,12 +720,12 @@ class GnociGymEnv(gym.Env):
             foot_airtime_reward  = self._get_foot_airtime_reward()
             foot_clearance_reward = self._get_foot_clearance_reward()
             orientation_reward   = self._get_orientation_reward()
-            heading_reward       = self._get_heading_reward()
             yoke_joint_reward    = self._get_yoke_joint_reward()
             yoke_symmetry_reward = self._get_yoke_symmetry_reward()
             action_magnitude_reward = self._get_action_magnitude_reward()
             action_bounds_reward = self._get_action_bounds_reward()
             action_rate_reward = self._get_action_rate_reward()
+            rotation_penalty_reward = self._get_rotation_penalty_reward()
 
             # Motion-only locomotion terms. velocity/airtime/clearance are ~0
             # while still; foot_contact only pays on single-foot support.
@@ -719,7 +739,6 @@ class GnociGymEnv(gym.Env):
             # robot earns ~0 from it (no alternate standing floor).
             posture = velocity_reward * (
                 c['orientation'] * orientation_reward
-                + c['heading']   * heading_reward
                 + c['yoke_joint']    * yoke_joint_reward
                 + c['yoke_symmetry'] * yoke_symmetry_reward
             )
@@ -729,6 +748,7 @@ class GnociGymEnv(gym.Env):
             action_magnitude_term = -c['action_magnitude'] * action_magnitude_reward
             action_bounds_term = -c['action_bounds'] * action_bounds_reward
             action_rate_term = -c['action_rate'] * action_rate_reward
+            rotation_term = -c['rotation'] * rotation_penalty_reward
             # The shaped reward is gated by posture quality (so falling throttles
             # it toward 0). The only thing payable while still is the decaying
             # survival_bonus; falling is penalised rather than rewarded.
@@ -739,6 +759,7 @@ class GnociGymEnv(gym.Env):
                 + action_magnitude_term
                 + action_bounds_term
                 + action_rate_term
+                + rotation_term
             )
 
             # Each value here is the final, weighted/gated contribution to
@@ -750,7 +771,6 @@ class GnociGymEnv(gym.Env):
                 'foot_airtime':   stand_gate * c['foot_airtime']   * foot_airtime_reward,
                 'foot_clearance': stand_gate * c['foot_clearance'] * foot_clearance_reward,
                 'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
-                'heading':        stand_gate * velocity_reward * c['heading']    * heading_reward,
                 'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint']    * yoke_joint_reward,
                 'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,
                 'survival_bonus': self.survival_bonus,
@@ -758,6 +778,7 @@ class GnociGymEnv(gym.Env):
                 'action_magnitude': action_magnitude_term,
                 'action_bounds':  action_bounds_term,
                 'action_rate':    action_rate_term,
+                'rotation':       rotation_term,
             })
             return reward, components
 
