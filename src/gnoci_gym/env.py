@@ -140,6 +140,7 @@ class GnociGymEnv(gym.Env):
         'fall':          0.5,
         'orientation':   0.1,
         'rotation':      0.5,
+        'strafe':        2.5,
         'yoke_joint':    0.0,
         'yoke_symmetry': 0.1,
         'action_magnitude': 0.05,
@@ -610,6 +611,18 @@ class GnociGymEnv(gym.Env):
         # penalised on its own terms instead of just zeroing out forward credit.
         return float(np.square(self._get_yaw_rate()))
 
+    def _get_strafe_penalty_reward(self):
+        # Sideways speed relative to the robot's own forward axis (not world
+        # X) — so it stays meaningful under turns, same reasoning as
+        # _get_velocity_reward's forward term. Still privileged sim state
+        # (world-frame CoM velocity), same as forward speed itself; unlike
+        # rotation there's no gyro-measurable substitute for this one, it's a
+        # training-time-only shaping term.
+        velocity = self._get_velocity()
+        forward_xy = self._get_body_forward_xy()
+        right_xy = np.array([forward_xy[1], -forward_xy[0]])
+        return float(abs(np.dot(velocity[:2], right_xy)))
+
     def _get_foot_clearance_reward(self):
         """Reward committing to a step: credit the height difference between the
         feet so one foot must clearly leave the ground. Exactly 0 when both feet
@@ -726,6 +739,7 @@ class GnociGymEnv(gym.Env):
             action_bounds_reward = self._get_action_bounds_reward()
             action_rate_reward = self._get_action_rate_reward()
             rotation_penalty_reward = self._get_rotation_penalty_reward()
+            strafe_penalty_reward = self._get_strafe_penalty_reward()
 
             # Motion-only locomotion terms. velocity/airtime/clearance are ~0
             # while still; foot_contact only pays on single-foot support.
@@ -749,6 +763,7 @@ class GnociGymEnv(gym.Env):
             action_bounds_term = -c['action_bounds'] * action_bounds_reward
             action_rate_term = -c['action_rate'] * action_rate_reward
             rotation_term = -c['rotation'] * rotation_penalty_reward
+            strafe_term = -c['strafe'] * strafe_penalty_reward
             # The shaped reward is gated by posture quality (so falling throttles
             # it toward 0). The only thing payable while still is the decaying
             # survival_bonus; falling is penalised rather than rewarded.
@@ -760,6 +775,7 @@ class GnociGymEnv(gym.Env):
                 + action_bounds_term
                 + action_rate_term
                 + rotation_term
+                + strafe_term
             )
 
             # Each value here is the final, weighted/gated contribution to
@@ -779,6 +795,7 @@ class GnociGymEnv(gym.Env):
                 'action_bounds':  action_bounds_term,
                 'action_rate':    action_rate_term,
                 'rotation':       rotation_term,
+                'strafe':         strafe_term,
             })
             return reward, components
 
