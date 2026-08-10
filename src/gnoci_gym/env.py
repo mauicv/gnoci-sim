@@ -213,10 +213,23 @@ class GnociGymEnv(gym.Env):
         self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
+        self.policy_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 # joint pos, joint vel, touch, imu (accelerometer (3) and gyroscope (3)), pitch+roll (2)
+        # critic also recieves gravity vector (3), base lin v (3), base angular v (3), base height (1), foot lin v (2 feet x 3), foot air time (2). Total 18.
+        self.critic_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 + 18
+
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
-            shape=(_N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2,),  # joint pos, joint vel, touch, imu, pitch+roll
+            shape=(self.policy_observation_space_size + self.critic_observation_space_size,),
             dtype=np.float32
+        )
+        # Index vectors into the flat observation returned by step()/reset(),
+        # so callers can do policy_obs = obs[env.policy_obs_idx] and
+        # critic_obs = obs[env.critic_obs_idx] instead of hardcoding the
+        # split point. See _get_obs for the concatenation order these mirror.
+        self.policy_obs_idx = np.arange(self.policy_observation_space_size)
+        self.critic_obs_idx = np.arange(
+            self.policy_observation_space_size,
+            self.policy_observation_space_size + self.critic_observation_space_size,
         )
         self.action_space = gym.spaces.Box(
             -1, 1, shape=(_N_JOINTS,), dtype=np.float32
@@ -468,7 +481,7 @@ class GnociGymEnv(gym.Env):
     def _get_contact_forces(self):
         return self._contact_states
 
-    def _get_obs(self):
+    def _get_policy_obs(self):
         self._update_contact_states()
         gyro, acc = self._get_imu_data()
         joint_pos = self._get_joint_positions() / np.pi
@@ -492,6 +505,46 @@ class GnociGymEnv(gym.Env):
         else:
             noisey_obs = obs
         return noisey_obs.astype(np.float32), obs.astype(np.float32)
+
+    def _get_critic_only_obs(self):
+        """Privileged features only the critic sees (asymmetric actor-critic):
+        no real-hardware equivalent, so never exposed to the policy slice of
+        the observation. All noise-free, and expressed in the robot's own
+        body frame (rather than world frame) for the same reason forward
+        velocity/rotation/strafe rewards were switched to body-relative —
+        orientation-invariant and not tied to a fixed global heading."""
+        xmat = self.data.xmat[self.body_id].reshape(3, 3)
+
+        gravity_body = xmat.T @ np.array([0.0, 0.0, -1.0])
+        base_lin_v_body = xmat.T @ self._get_velocity()
+
+        gyro_addr = self.imu_sensor_addrs[0]
+        base_ang_v_body = self.data.sensordata[gyro_addr:gyro_addr + 3]  # gyro is already body-frame
+
+        base_height = self._get_root_height()
+
+        left_foot_v_body = xmat.T @ self.data.cvel[self.left_foot_body_id][3:6]
+        right_foot_v_body = xmat.T @ self.data.cvel[self.right_foot_body_id][3:6]
+
+        foot_airtime = np.array(self._foot_airtime, dtype=np.float32)
+
+        return np.concatenate([
+            gravity_body,
+            base_lin_v_body,
+            base_ang_v_body,
+            [base_height],
+            left_foot_v_body,
+            right_foot_v_body,
+            foot_airtime,
+        ]).astype(np.float32)
+
+    def _get_obs(self):
+        noise_policy_obs, clean_policy_obs = self._get_policy_obs()
+        critic_only_obs = self._get_critic_only_obs()
+
+        noisey_state = np.concatenate([noise_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
+        state = np.concatenate([clean_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
+        return noisey_state.astype(np.float32), state.astype(np.float32)
 
     def _get_info(self):
         return {}
