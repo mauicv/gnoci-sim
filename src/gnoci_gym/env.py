@@ -662,7 +662,14 @@ class GnociGymEnv(gym.Env):
         # world-frame lateral drift (see _get_yaw_rate). A separate ungated
         # term rather than a gate on forward velocity, so spinning is always
         # penalised on its own terms instead of just zeroing out forward credit.
-        return float(np.square(self._get_yaw_rate()))
+        # Normalised by target_velocity, same reference _get_velocity_reward
+        # uses to normalise forward_reward to [0, 1] — raw rad/s is tiny next
+        # to a bounded [0, 1] reward, so without this the coefficients aren't
+        # actually comparable regardless of what they're set to.
+        yaw_rate = self._get_yaw_rate()
+        if self.target_velocity <= 0.0:
+            return float(np.square(yaw_rate))
+        return float(np.square(yaw_rate / self.target_velocity))
 
     def _get_strafe_penalty_reward(self):
         # Sideways speed relative to the robot's own forward axis (not world
@@ -671,10 +678,16 @@ class GnociGymEnv(gym.Env):
         # (world-frame CoM velocity), same as forward speed itself; unlike
         # rotation there's no gyro-measurable substitute for this one, it's a
         # training-time-only shaping term.
+        # Normalised by target_velocity for the same reason as rotation above:
+        # expresses drift as a fraction of target speed, comparable to
+        # forward_reward's [0, 1] scale instead of raw (tiny) m/s.
         velocity = self._get_velocity()
         forward_xy = self._get_body_forward_xy()
         right_xy = np.array([forward_xy[1], -forward_xy[0]])
-        return float(abs(np.dot(velocity[:2], right_xy)))
+        strafe = float(abs(np.dot(velocity[:2], right_xy)))
+        if self.target_velocity <= 0.0:
+            return strafe
+        return strafe / self.target_velocity
 
     def _get_foot_clearance_reward(self):
         """Reward committing to a step: credit the height difference between the
