@@ -61,6 +61,7 @@ plt.rcParams.update({
     "axes.facecolor": "#F9FAFB",
 })
 
+import math
 
 def _load_rollout(path):
     with open(path) as f:
@@ -69,7 +70,7 @@ def _load_rollout(path):
     if "target_actions" in d:
         actions = d["target_actions"][:50*3]
     else:
-        actions = d["actions"][:50*3]
+        actions = (np.array(d["actions"][:50*3]) * 0.75 * math.pi).tolist()
     return {
         "states": np.array(states, dtype=float),
         "actions": np.array(actions, dtype=float),
