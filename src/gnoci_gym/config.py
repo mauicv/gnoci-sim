@@ -1,4 +1,4 @@
-CONTROL_HZ = 60
+CONTROL_HZ = 50
 # Hardware low-passes the accelerometer and joint velocities before building
 # the obs (gnoci-control sensors.py) — these alphas must match its values.
 ACC_FILTER_ALPHA       = 1

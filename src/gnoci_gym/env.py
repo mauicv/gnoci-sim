@@ -921,6 +921,7 @@ class GnociGymEnv(gym.Env):
                 self._push_step = 0
                 self._push_interval = self._sample_push_interval()
 
+        target_actions = []
         for i in range(self.model.nu):
             # Absolute position control: action in [-1, 1] scales to a target
             # offset (in radians) from the joint's default pose (qpos == 0,
@@ -930,13 +931,14 @@ class GnociGymEnv(gym.Env):
             lo, hi = self.joint_ranges[i]
             target = self.action_scale * filtered
             self.data.ctrl[i] = float(np.clip(target, lo, hi))
+            target_actions.append(target.tolist())
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
         reward, reward_components = self._get_reward()
         if self._body_below_floor():
             self.done = True
-        return (noisey_state, reward, self.done, self.done, {'state': state, 'reward_components': reward_components})
+        return (noisey_state, reward, self.done, self.done, {'state': state, 'reward_components': reward_components, 'target_action': target_actions})
 
     def render(self, mode='rgb_array'):
         if mode == 'rgb_array':
