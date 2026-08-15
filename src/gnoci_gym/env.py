@@ -65,11 +65,11 @@ OBS_NOISE_SCALES = dict(
     hip_pos=0.03,   # rad, for each hip joint
     knee_pos=0.05,  # rad, for each knee joint
     ankle_pos=0.08, # rad, for each ankle joint
-    joint_vel=2.5,  # rad/s # Was 1.5
-    gravity=0.1,    # rad, applied to the pitch/roll estimate
+    joint_vel=0.5,  # rad/s # Was 1.5
+    gravity=0.01,    # rad, applied to the pitch/roll estimate
     linvel=0.1,     # unused: no linvel in the obs
-    gyro=0.1,       # rad/s
-    accelerometer=0.05,  # m/s²
+    gyro=0.5,       # rad/s
+    accelerometer=0.075,  # m/s²
 )
 
 
