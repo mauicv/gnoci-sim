@@ -176,7 +176,7 @@ class GnociGymEnv(gym.Env):
             target_velocity=0.1,
             target_velocity_band=0.1,
             foot_clearance_height=0.02,
-            kp=50.0,
+            kp=25.0,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
         # trainer can ramp them between phases (e.g. SB3 env_method/set_attr) via
