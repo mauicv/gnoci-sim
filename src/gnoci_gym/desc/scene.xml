@@ -4,7 +4,7 @@
     <default>
         <default class="miuzei_25kg">
             <position 
-                kp="49.80626029233553"
+                kp="25"
                 kv="2.5679157997056907"
                 ctrllimited="true"
                 forcerange="-2.4377543428059765 2.4377543428059765"
