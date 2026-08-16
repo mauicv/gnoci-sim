@@ -39,13 +39,18 @@ _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
-_CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
 _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist this long to register
 # Hysteresis thresholds (N) mimicking the limit switches' actuation/release
 # forces: contact turns on above ON, off below OFF.  Standing loads are
 # ~2.7 N on the lightest (front) sites, so ON stays well below stance forces.
 _CONTACT_FORCE_ON  = 1.0
 _CONTACT_FORCE_OFF = 0.5
+# Target single-support swing duration for the foot_swing reward (see
+# _get_foot_swing_reward): the time-credit fraction ramps 0->1 as continuous
+# single-support airtime approaches this, then holds. The matching height
+# cap is self.foot_clearance_height, not a constant, so it can be annealed
+# via set_curriculum() during training.
+_SWING_TIME_CAP = 0.4  # seconds
 
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
@@ -134,9 +139,7 @@ class GnociGymEnv(gym.Env):
         'both_feet':     0.5,
         'default_pose':  0.5,
         'velocity':      2.5,
-        'foot_contact':  0.75,
-        'foot_airtime':  0.5,
-        'foot_clearance': 0.5,
+        'foot_swing':    1.0,
         'fall':          0.5,
         'orientation':   0.1,
         'rotation':      0.5,
@@ -175,7 +178,7 @@ class GnociGymEnv(gym.Env):
             survival_bonus=0.2,
             target_velocity=0.1,
             target_velocity_band=0.1,
-            foot_clearance_height=0.02,
+            foot_clearance_height=0.04,
             kp=25.0,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
@@ -186,6 +189,10 @@ class GnociGymEnv(gym.Env):
         self.survival_bonus = float(survival_bonus)
         self.target_velocity = float(target_velocity)
         self.target_velocity_band = float(target_velocity_band)
+        # Swing-foot height (metres) that earns full height-credit in
+        # _get_foot_swing_reward — not a fixed constant so it can be
+        # curriculum-annealed (e.g. start low, close to what the policy can
+        # already reach, and ramp toward the real target height).
         self.foot_clearance_height = float(foot_clearance_height)
         # Actuator position gain (matches the XML's <position kp="..."/> default,
         # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
@@ -330,13 +337,10 @@ class GnociGymEnv(gym.Env):
         self.action_filters = [EMAFilter(alpha=self.action_filter_alpha) for _ in range(_N_JOINTS)]
         self.acc_filters = [EMAFilter(alpha=ACC_FILTER_ALPHA, warm_start=True) for _ in range(3)]
         self.joint_vel_filters = [EMAFilter(alpha=JOINT_VEL_FILTER_ALPHA, warm_start=True) for _ in range(_N_JOINTS)]
-        self._grace_steps = max(1, int(_CONTACT_GRACE_PERIOD * self.control_hz))
-        self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
         self._debounce_steps = max(1, int(_CONTACT_DEBOUNCE_PERIOD * self.control_hz))
         self.contact_debouncers = [Debouncer(self._debounce_steps) for _ in range(_N_TOUCH)]
         self._contact_states = np.zeros(_N_TOUCH, dtype=np.float32)
         self._foot_airtime = [0.0, 0.0]
-        self._foot_was_contact = [False, False]
 
         if hasattr(self, '_renderer') and self._renderer is not None:
             self._renderer.close()
@@ -466,11 +470,9 @@ class GnociGymEnv(gym.Env):
         self._push_step = 0
         self._push_interval = self._sample_push_interval()
 
-        self._contact_buffer = deque([False] * self._grace_steps, maxlen=self._grace_steps)
         for d in self.contact_debouncers:
             d.reset()
         self._foot_airtime = [0.0, 0.0]
-        self._foot_was_contact = [False, False]
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
 
@@ -624,23 +626,6 @@ class GnociGymEnv(gym.Env):
         gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
         return float(self.permute_imu_data(gyro)[2])
 
-    def _get_foot_airtime_reward(self):
-        dt = 1.0 / self.control_hz
-        contacts = self._contact_states
-        current = [
-            contacts[0] > 0 or contacts[1] > 0,  # left foot
-            contacts[2] > 0 or contacts[3] > 0,  # right foot
-        ]
-        reward = 0.0
-        for i, (in_contact, was_contact) in enumerate(zip(current, self._foot_was_contact)):
-            if not in_contact:
-                self._foot_airtime[i] += dt
-            elif not was_contact:  # touchdown
-                reward += self._foot_airtime[i] - 0.075
-                self._foot_airtime[i] = 0.0
-        self._foot_was_contact = current
-        return reward
-
     def _get_stand_gate(self):
         """Posture quality in [0, 1]: 1 when upright at standing height, decaying
         as the robot tips or sinks. Used as a multiplicative gate on the shaped
@@ -712,19 +697,6 @@ class GnociGymEnv(gym.Env):
             return strafe
         return strafe / self.target_velocity
 
-    def _get_foot_clearance_reward(self):
-        """Reward committing to a step: credit the height difference between the
-        feet so one foot must clearly leave the ground. Exactly 0 when both feet
-        are at the same height (e.g. planted), ramping to 1 once the swing foot
-        is ``2 * foot_clearance_height`` above the stance foot."""
-        threshold = self.foot_clearance_height
-        if threshold <= 0.0:
-            return 0.0
-        lz = self.data.xpos[self.left_foot_body_id][2]
-        rz = self.data.xpos[self.right_foot_body_id][2]
-        clearance = abs(lz - rz)
-        return float(np.clip((clearance - threshold) / threshold, 0.0, 1.0))
-
     def _get_orientation_reward(self):
         pitch = float(self.comp_filter.pitch)
         roll  = float(self.comp_filter.roll)
@@ -765,13 +737,44 @@ class GnociGymEnv(gym.Env):
             return np.zeros(2)
         return body_forward / norm
 
-    def _get_foot_contact_reward(self):
+    def _get_foot_swing_reward(self):
+        """Dense single-support swing-quality reward.
+
+        For whichever foot is airborne while the other is planted, credit is
+        the product of two fractions, each ramping linearly from 0 and
+        holding at 1 past its cap: how far into the target swing duration
+        (_SWING_TIME_CAP) the current continuous airtime is, and how close
+        to the target swing height (self.foot_clearance_height) the foot
+        currently is. Multiplying the two means neither a long-but-flat lift
+        nor a high-but-momentary tap earns much on its own — both a real
+        duration and a real height are required together.
+
+        0 during double support and while both feet are airborne at once
+        (no single-support foot to credit, e.g. a hop/stumble).
+        """
+        dt = 1.0 / self.control_hz
         contacts = self._contact_states
-        left  = contacts[0] > 0 or contacts[1] > 0
-        right = contacts[2] > 0 or contacts[3] > 0
-        single = left ^ right
-        self._contact_buffer.append(single)
-        return 1.0 if any(self._contact_buffer) else 0.0
+        in_contact = [
+            contacts[0] > 0 or contacts[1] > 0,  # left foot
+            contacts[2] > 0 or contacts[3] > 0,  # right foot
+        ]
+        foot_z = [
+            self.data.xpos[self.left_foot_body_id][2] - self.floor_z,
+            self.data.xpos[self.right_foot_body_id][2] - self.floor_z,
+        ]
+
+        reward = 0.0
+        for i, other in ((0, 1), (1, 0)):
+            if in_contact[i]:
+                self._foot_airtime[i] = 0.0
+                continue
+            self._foot_airtime[i] += dt
+            if not in_contact[other] or self.foot_clearance_height <= 0.0:
+                continue
+            time_frac = min(1.0, self._foot_airtime[i] / _SWING_TIME_CAP)
+            height_frac = min(1.0, max(0.0, foot_z[i]) / self.foot_clearance_height)
+            reward += time_frac * height_frac
+        return reward
 
     def _get_both_feet_contact_reward(self):
         contacts = self._contact_states
@@ -818,9 +821,7 @@ class GnociGymEnv(gym.Env):
 
         if self.task == 'walk':
             velocity_reward      = self._get_velocity_reward()
-            foot_contact_reward  = self._get_foot_contact_reward()
-            foot_airtime_reward  = self._get_foot_airtime_reward()
-            foot_clearance_reward = self._get_foot_clearance_reward()
+            foot_swing_reward    = self._get_foot_swing_reward()
             orientation_reward   = self._get_orientation_reward()
             yoke_joint_reward    = self._get_yoke_joint_reward()
             yoke_symmetry_reward = self._get_yoke_symmetry_reward()
@@ -830,13 +831,12 @@ class GnociGymEnv(gym.Env):
             rotation_penalty_reward = self._get_rotation_penalty_reward()
             strafe_penalty_reward = self._get_strafe_penalty_reward()
 
-            # Motion-only locomotion terms. velocity/airtime/clearance are ~0
-            # while still; foot_contact only pays on single-foot support.
+            # Motion-only locomotion terms: both are ~0 while still, and
+            # foot_swing only pays during a genuine single-support swing that
+            # gets real duration and real height (see _get_foot_swing_reward).
             locomotion = (
-                c['velocity']       * velocity_reward
-                + c['foot_contact']  * foot_contact_reward
-                + c['foot_airtime']  * foot_airtime_reward
-                + c['foot_clearance'] * foot_clearance_reward
+                c['velocity']    * velocity_reward
+                + c['foot_swing'] * foot_swing_reward
             )
             # Posture shaping, gated by forward motion so a motionless-but-tidy
             # robot earns ~0 from it (no alternate standing floor).
@@ -872,9 +872,7 @@ class GnociGymEnv(gym.Env):
             # total, so they can be plotted as a stacked breakdown.
             components.update({
                 'velocity':       stand_gate * c['velocity']       * velocity_reward,
-                'foot_contact':   stand_gate * c['foot_contact']   * foot_contact_reward,
-                'foot_airtime':   stand_gate * c['foot_airtime']   * foot_airtime_reward,
-                'foot_clearance': stand_gate * c['foot_clearance'] * foot_clearance_reward,
+                'foot_swing':     stand_gate * c['foot_swing']     * foot_swing_reward,
                 'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
                 'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint']    * yoke_joint_reward,
                 'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,

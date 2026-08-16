@@ -17,19 +17,21 @@ def make_env(seed=1, max_steps=NUM_STEPS, test: bool=False):
     config = test_cfg if test else dom_rnd_cfg
     kwargs = {
         **config,
+
+        "obs_noise_level": 1.0,
+
         "target_velocity": 0.1,
         "target_velocity_band": 0.1,
         "action_filter_alpha": 0.75,
         "control_hz": CONTROL_HZ,
         "task": 'walk',
+        "action_scale": 0.125,
         "reward_coefs": {
             'stand':            1.0,
             'velocity':         2.5,
             'rotation':         0.05,
             'strafe':           0.05,
-            'foot_contact':     0.75,
-            'foot_airtime':     0.5,
-            'foot_clearance':   0.5,
+            'foot_swing':       1.0,
             'orientation':      1.0,
             'yoke_joint':       2.0,
             'action_magnitude': 0.0,
