@@ -39,7 +39,7 @@ _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
-_CONTACT_GRACE_PERIOD = 0.2  # seconds — grace window for single-foot contact reward
+_CONTACT_GRACE_PERIOD = 0.5  # seconds — grace window for single-foot contact reward
 _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist this long to register
 # Hysteresis thresholds (N) mimicking the limit switches' actuation/release
 # forces: contact turns on above ON, off below OFF.  Standing loads are
