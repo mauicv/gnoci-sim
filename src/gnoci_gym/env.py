@@ -176,6 +176,7 @@ class GnociGymEnv(gym.Env):
             target_velocity=0.1,
             target_velocity_band=0.1,
             foot_clearance_height=0.02,
+            kp=25.0,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
         # trainer can ramp them between phases (e.g. SB3 env_method/set_attr) via
@@ -186,6 +187,10 @@ class GnociGymEnv(gym.Env):
         self.target_velocity = float(target_velocity)
         self.target_velocity_band = float(target_velocity_band)
         self.foot_clearance_height = float(foot_clearance_height)
+        # Actuator position gain (matches the XML's <position kp="..."/> default,
+        # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
+        # _apply_kp() is (re-)applied in _build_model() once the model compiles.
+        self.kp = float(kp)
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
@@ -318,6 +323,7 @@ class GnociGymEnv(gym.Env):
         self._randomizable_body_ids = np.nonzero(self._base_body_mass > 0)[0]
         self._base_actuator_gainprm = self.model.actuator_gainprm.copy()
         self._base_actuator_biasprm = self.model.actuator_biasprm.copy()
+        self._apply_kp(self.kp)
         self._base_gravity_z = float(self.model.opt.gravity[2])
 
         self.comp_filter = ComplementaryFilter()
@@ -335,6 +341,16 @@ class GnociGymEnv(gym.Env):
         if hasattr(self, '_renderer') and self._renderer is not None:
             self._renderer.close()
         self._renderer = mujoco.Renderer(self.model)
+
+    def _apply_kp(self, kp):
+        """(Re-)baseline the actuators' position gain that _randomize_dynamics()
+        scales by actuator_gain_range each reset. biasprm[1] is the matching
+        position term (-kp); the velocity term (biasprm[2], set at compile time
+        from the XML's dampratio) is left untouched, same as _randomize_dynamics
+        does when it scales gainprm/biasprm[1] by actuator_gain_range."""
+        self.kp = float(kp)
+        self._base_actuator_gainprm[:, 0] = self.kp
+        self._base_actuator_biasprm[:, 1] = -self.kp
 
     def _randomize_dynamics(self):
         """Per-episode domain randomization, applied directly to the already-
@@ -407,12 +423,17 @@ class GnociGymEnv(gym.Env):
             target_velocity=None,
             target_velocity_band=None,
             foot_clearance_height=None,
+            kp=None,
     ):
         """Update curriculum knobs mid-training.
 
         Intended to be driven by the trainer (e.g. via SB3 ``env_method``) to
         anneal the standing floor and exploration noise away while ramping the
         forward-speed target up. Only provided values are changed.
+
+        ``kp`` re-baselines the actuator position gain (see _apply_kp); it
+        takes effect on the next reset(), same as the other dynamics-
+        randomization ranges, since _randomize_dynamics() only runs there.
         """
         if survival_bonus is not None:
             self.survival_bonus = max(0.0, float(survival_bonus))
@@ -422,6 +443,8 @@ class GnociGymEnv(gym.Env):
             self.target_velocity_band = max(0.0, float(target_velocity_band))
         if foot_clearance_height is not None:
             self.foot_clearance_height = max(0.0, float(foot_clearance_height))
+        if kp is not None:
+            self._apply_kp(max(0.0, float(kp)))
 
     def _sample_push_interval(self):
         lo = int(self.push_interval_range[0] * self.control_hz)
