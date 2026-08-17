@@ -45,12 +45,6 @@ _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist thi
 # ~2.7 N on the lightest (front) sites, so ON stays well below stance forces.
 _CONTACT_FORCE_ON  = 1.0
 _CONTACT_FORCE_OFF = 0.5
-# Target single-support swing duration for the foot_swing reward (see
-# _get_foot_swing_reward): the time-credit fraction ramps 0->1 as continuous
-# single-support airtime approaches this, then holds. The matching height
-# cap is self.foot_clearance_height, not a constant, so it can be annealed
-# via set_curriculum() during training.
-_SWING_TIME_CAP = 0.4  # seconds
 
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
@@ -179,6 +173,7 @@ class GnociGymEnv(gym.Env):
             target_velocity=0.1,
             target_velocity_band=0.1,
             foot_clearance_height=0.04,
+            swing_time=0.4,
             kp=25.0,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
@@ -194,6 +189,10 @@ class GnociGymEnv(gym.Env):
         # curriculum-annealed (e.g. start low, close to what the policy can
         # already reach, and ramp toward the real target height).
         self.foot_clearance_height = float(foot_clearance_height)
+        # Target single-support swing duration (seconds) that earns full
+        # time-credit in _get_foot_swing_reward — likewise curriculum-
+        # annealable rather than fixed.
+        self.swing_time = float(swing_time)
         # Actuator position gain (matches the XML's <position kp="..."/> default,
         # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
         # _apply_kp() is (re-)applied in _build_model() once the model compiles.
@@ -427,6 +426,7 @@ class GnociGymEnv(gym.Env):
             target_velocity=None,
             target_velocity_band=None,
             foot_clearance_height=None,
+            swing_time=None,
             kp=None,
     ):
         """Update curriculum knobs mid-training.
@@ -447,6 +447,8 @@ class GnociGymEnv(gym.Env):
             self.target_velocity_band = max(0.0, float(target_velocity_band))
         if foot_clearance_height is not None:
             self.foot_clearance_height = max(0.0, float(foot_clearance_height))
+        if swing_time is not None:
+            self.swing_time = max(0.0, float(swing_time))
         if kp is not None:
             self._apply_kp(max(0.0, float(kp)))
 
@@ -743,11 +745,13 @@ class GnociGymEnv(gym.Env):
         For whichever foot is airborne while the other is planted, credit is
         the product of two fractions, each ramping linearly from 0 and
         holding at 1 past its cap: how far into the target swing duration
-        (_SWING_TIME_CAP) the current continuous airtime is, and how close
+        (self.swing_time) the current continuous airtime is, and how close
         to the target swing height (self.foot_clearance_height) the foot
         currently is. Multiplying the two means neither a long-but-flat lift
         nor a high-but-momentary tap earns much on its own — both a real
-        duration and a real height are required together.
+        duration and a real height are required together. Both caps are
+        plain attributes (rather than module constants) so they can be
+        curriculum-annealed via set_curriculum().
 
         0 during double support and while both feet are airborne at once
         (no single-support foot to credit, e.g. a hop/stumble).
@@ -769,9 +773,9 @@ class GnociGymEnv(gym.Env):
                 self._foot_airtime[i] = 0.0
                 continue
             self._foot_airtime[i] += dt
-            if not in_contact[other] or self.foot_clearance_height <= 0.0:
+            if not in_contact[other] or self.swing_time <= 0.0 or self.foot_clearance_height <= 0.0:
                 continue
-            time_frac = min(1.0, self._foot_airtime[i] / _SWING_TIME_CAP)
+            time_frac = min(1.0, self._foot_airtime[i] / self.swing_time)
             height_frac = min(1.0, max(0.0, foot_z[i]) / self.foot_clearance_height)
             reward += time_frac * height_frac
         return reward

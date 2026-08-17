@@ -18,14 +18,14 @@ def make_env(seed=1, max_steps=NUM_STEPS, test: bool=False):
     kwargs = {
         **config,
 
-        "obs_noise_level": 1.0,
+        "obs_noise_level": 0.0,
 
         "target_velocity": 0.1,
         "target_velocity_band": 0.1,
         "action_filter_alpha": 0.75,
         "control_hz": CONTROL_HZ,
         "task": 'walk',
-        "action_scale": 0.125,
+        "action_scale": 0.25,
         "reward_coefs": {
             'stand':            1.0,
             'velocity':         2.5,
