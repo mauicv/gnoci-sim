@@ -54,8 +54,9 @@ IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 # threaded through here because _randomize_dynamics() stamps
 # dof_frictionloss/dof_armature on every reset, so the MJCF values alone
 # never survive past construction.
-SYSID_JOINT_FRICTIONLOSS = 0.0072408653310164755
-SYSID_JOINT_ARMATURE     = 0.014643797951585229
+
+SYSID_JOINT_FRICTIONLOSS = 0.006426057652042094
+SYSID_JOINT_ARMATURE     = 0.012995945315907826
 
 # Per-sensor observation noise scales, in raw sensor units (rad, rad/s, m/s²).
 # Sampled uniform(-scale, scale) and converted into obs units with the same
