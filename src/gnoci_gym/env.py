@@ -90,6 +90,7 @@ def _build_obs_noise_vec(scales):
         np.full(3, scales['gyro'] * IMU_GYRO_SCALE),
         np.full(3, scales['accelerometer'] / IMU_ACC_SCALE),
         np.full(2, scales['gravity']),                          # pitch/roll in rad
+        np.zeros(_N_JOINTS),                                    # commanded target is known exactly, stays clean
     ])
 
 test_cfg = dict(
@@ -176,6 +177,7 @@ class GnociGymEnv(gym.Env):
             foot_clearance_height=0.04,
             swing_time=0.4,
             kp=25.0,
+            max_actuator_velocity=6.5,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
         # trainer can ramp them between phases (e.g. SB3 env_method/set_attr) via
@@ -198,6 +200,10 @@ class GnociGymEnv(gym.Env):
         # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
         # _apply_kp() is (re-)applied in _build_model() once the model compiles.
         self.kp = float(kp)
+        # Actuator slew-rate limit (rad/s), applied in step() to the commanded
+        # target before it reaches the position servo. Default is the
+        # miuzei_25kg no-load speed rating (~0.16s/60°  ~6.5 rad/s).
+        self.max_actuator_velocity = float(max_actuator_velocity)
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
@@ -225,9 +231,11 @@ class GnociGymEnv(gym.Env):
         self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
-        self.policy_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 # joint pos, joint vel, touch, imu (accelerometer (3) and gyroscope (3)), pitch+roll (2)
-        # critic also recieves gravity vector (3), base lin v (3), base angular v (3), base height (1), foot lin v (2 feet x 3), foot air time (2). Total 18.
-        self.critic_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 + 18
+        self.policy_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 + _N_JOINTS # joint pos, joint vel, touch, imu (accelerometer (3) and gyroscope (3)), pitch+roll (2), prev commanded target
+        # critic sees a clean (noise-free) copy of the policy obs plus privileged
+        # extras: gravity vector (3), base lin v (3), base angular v (3), base
+        # height (1), foot lin v (2 feet x 3), foot air time (2). Total +18.
+        self.critic_observation_space_size = self.policy_observation_space_size + 18
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
@@ -259,6 +267,9 @@ class GnociGymEnv(gym.Env):
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        # Rate-limiter state (see step()): starts at the actuators' initial
+        # commanded position so the first step isn't slew-limited relative to 0.
+        self._prev_target = self.data.ctrl.copy().astype(np.float32)
 
     def _build_model(self):
         """One-time model compile + cache. Not called on reset() — only the
@@ -478,6 +489,7 @@ class GnociGymEnv(gym.Env):
         self._foot_airtime = [0.0, 0.0]
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._prev_target = self.data.ctrl.copy().astype(np.float32)
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)
@@ -526,6 +538,7 @@ class GnociGymEnv(gym.Env):
             *gyro,
             *acc_filtered,
             *self._get_pitch_and_roll(gyro * 250, acc),
+            *self._prev_target,
         ])
         if self.obs_noise_level > 0:
             noise = np.random.uniform(-1, 1, obs.shape) * self._obs_noise_vec
@@ -948,16 +961,26 @@ class GnociGymEnv(gym.Env):
                 self._push_interval = self._sample_push_interval()
 
         target_actions = []
+        max_step = self.max_actuator_velocity / self.control_hz
         for i in range(self.model.nu):
             # Absolute position control: action in [-1, 1] scales to a target
             # offset (in radians) from the joint's default pose (qpos == 0,
-            # see _set_joint_positions), then clips to the joint's range as a
-            # safety bound rather than an amplitude the policy is meant to hit.
+            # see _set_joint_positions). The raw target is then slew-rate
+            # limited to the actuator's max velocity (mirrors the physical
+            # servo, which can't jump instantly to a new position) before
+            # clipping to the joint's range as a safety bound rather than an
+            # amplitude the policy is meant to hit.
             filtered = self.action_filters[i].update(action[i])
             lo, hi = self.joint_ranges[i]
-            target = self.action_scale * filtered
-            self.data.ctrl[i] = float(np.clip(target, lo, hi))
-            target_actions.append(target.tolist())
+            raw_target = self.action_scale * filtered
+            new_target = np.clip(
+                raw_target,
+                self._prev_target[i] - max_step,
+                self._prev_target[i] + max_step,
+            )
+            self._prev_target[i] = new_target
+            self.data.ctrl[i] = float(np.clip(new_target, lo, hi))
+            target_actions.append(float(new_target))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
