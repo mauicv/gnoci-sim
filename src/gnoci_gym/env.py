@@ -440,6 +440,7 @@ class GnociGymEnv(gym.Env):
             foot_clearance_height=None,
             swing_time=None,
             kp=None,
+            max_actuator_velocity=None,
     ):
         """Update curriculum knobs mid-training.
 
@@ -450,6 +451,9 @@ class GnociGymEnv(gym.Env):
         ``kp`` re-baselines the actuator position gain (see _apply_kp); it
         takes effect on the next reset(), same as the other dynamics-
         randomization ranges, since _randomize_dynamics() only runs there.
+
+        ``max_actuator_velocity`` (see step()) is read directly every step, so
+        unlike ``kp`` it takes effect immediately, mid-episode included.
         """
         if survival_bonus is not None:
             self.survival_bonus = max(0.0, float(survival_bonus))
@@ -463,6 +467,8 @@ class GnociGymEnv(gym.Env):
             self.swing_time = max(0.0, float(swing_time))
         if kp is not None:
             self._apply_kp(max(0.0, float(kp)))
+        if max_actuator_velocity is not None:
+            self.max_actuator_velocity = max(0.0, float(max_actuator_velocity))
 
     def _sample_push_interval(self):
         lo = int(self.push_interval_range[0] * self.control_hz)
