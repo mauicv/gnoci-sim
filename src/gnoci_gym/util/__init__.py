@@ -21,7 +21,6 @@ def make_env(seed=1, max_steps=NUM_STEPS, test: bool=False):
         "obs_noise_level": 0.0,
 
         "target_velocity": 0.1,
-        "target_velocity_band": 0.1,
         "action_filter_alpha": 0.75,
         "control_hz": CONTROL_HZ,
         "task": 'walk',
