@@ -46,6 +46,10 @@ _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist thi
 _CONTACT_FORCE_ON  = 1.0
 _CONTACT_FORCE_OFF = 0.5
 
+# Denominator of the exp() falloff in _get_velocity_reward — smaller sigma
+# means the reward drops off faster as forward speed misses target_velocity.
+TRACKING_SIGMA = 0.01
+
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
@@ -172,8 +176,7 @@ class GnociGymEnv(gym.Env):
             reward_coefs=None,
             fix_root_body=False,
             survival_bonus=0.2,
-            target_velocity=0.1,
-            target_velocity_band=0.1,
+            target_velocity=0.2,
             foot_clearance_height=0.04,
             swing_time=0.4,
             kp=25.0,
@@ -186,7 +189,6 @@ class GnociGymEnv(gym.Env):
         # target_velocity upward.
         self.survival_bonus = float(survival_bonus)
         self.target_velocity = float(target_velocity)
-        self.target_velocity_band = float(target_velocity_band)
         # Swing-foot height (metres) that earns full height-credit in
         # _get_foot_swing_reward — not a fixed constant so it can be
         # curriculum-annealed (e.g. start low, close to what the policy can
@@ -436,7 +438,6 @@ class GnociGymEnv(gym.Env):
             *,
             survival_bonus=None,
             target_velocity=None,
-            target_velocity_band=None,
             foot_clearance_height=None,
             swing_time=None,
             kp=None,
@@ -459,8 +460,6 @@ class GnociGymEnv(gym.Env):
             self.survival_bonus = max(0.0, float(survival_bonus))
         if target_velocity is not None:
             self.target_velocity = max(0.0, float(target_velocity))
-        if target_velocity_band is not None:
-            self.target_velocity_band = max(0.0, float(target_velocity_band))
         if foot_clearance_height is not None:
             self.foot_clearance_height = max(0.0, float(foot_clearance_height))
         if swing_time is not None:
@@ -669,22 +668,8 @@ class GnociGymEnv(gym.Env):
         # global direction — so turning to walk a curve/heading still earns
         # forward credit, rather than only ever crediting motion toward -Y.
         forward = float(np.dot(velocity[:2], self._get_body_forward_xy()))
-        target = self.target_velocity
-        if forward <= 0.0 or target <= 0.0:
-            # Exactly zero at (or below) zero forward speed — no deadband leak,
-            # so standing still earns nothing from velocity.
-            forward_reward = 0.0
-        elif forward < target:
-            # Linear ramp from 0 at v=0 to 1 at the (curriculum) target speed.
-            forward_reward = forward / target
-        else:
-            # At/above target: full credit within the band, fading beyond it.
-            forward_reward = tolerance(
-                forward,
-                bounds=(target, target + self.target_velocity_band),
-                margin=target,
-            )
-        return forward_reward
+        lin_vel_error = (self.target_velocity - forward) ** 2
+        return float(np.nan_to_num(np.exp(-lin_vel_error / TRACKING_SIGMA)))
 
     def _get_rotation_penalty_reward(self):
         # Squared yaw rate (rad/s) — same gyro axis the complementary filter
