@@ -46,6 +46,10 @@ _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist thi
 _CONTACT_FORCE_ON  = 1.0
 _CONTACT_FORCE_OFF = 0.5
 
+# Denominator of the exp() falloff in _get_velocity_reward — smaller sigma
+# means the reward drops off faster as forward speed misses target_velocity.
+TRACKING_SIGMA = 0.01
+
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
@@ -90,6 +94,7 @@ def _build_obs_noise_vec(scales):
         np.full(3, scales['gyro'] * IMU_GYRO_SCALE),
         np.full(3, scales['accelerometer'] / IMU_ACC_SCALE),
         np.full(2, scales['gravity']),                          # pitch/roll in rad
+        np.zeros(_N_JOINTS),                                    # commanded target is known exactly, stays clean
     ])
 
 test_cfg = dict(
@@ -171,11 +176,11 @@ class GnociGymEnv(gym.Env):
             reward_coefs=None,
             fix_root_body=False,
             survival_bonus=0.2,
-            target_velocity=0.1,
-            target_velocity_band=0.1,
+            target_velocity=0.2,
             foot_clearance_height=0.04,
             swing_time=0.4,
             kp=25.0,
+            max_actuator_velocity=6.5,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
         # trainer can ramp them between phases (e.g. SB3 env_method/set_attr) via
@@ -184,7 +189,6 @@ class GnociGymEnv(gym.Env):
         # target_velocity upward.
         self.survival_bonus = float(survival_bonus)
         self.target_velocity = float(target_velocity)
-        self.target_velocity_band = float(target_velocity_band)
         # Swing-foot height (metres) that earns full height-credit in
         # _get_foot_swing_reward — not a fixed constant so it can be
         # curriculum-annealed (e.g. start low, close to what the policy can
@@ -198,6 +202,10 @@ class GnociGymEnv(gym.Env):
         # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
         # _apply_kp() is (re-)applied in _build_model() once the model compiles.
         self.kp = float(kp)
+        # Actuator slew-rate limit (rad/s), applied in step() to the commanded
+        # target before it reaches the position servo. Default is the
+        # miuzei_25kg no-load speed rating (~0.16s/60°  ~6.5 rad/s).
+        self.max_actuator_velocity = float(max_actuator_velocity)
         self.camera = camera
         self.render_mode = render_mode
         self.task = task
@@ -225,9 +233,11 @@ class GnociGymEnv(gym.Env):
         self.fix_root_body = fix_root_body
         self.metadata['render_fps'] = control_hz
 
-        self.policy_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 # joint pos, joint vel, touch, imu (accelerometer (3) and gyroscope (3)), pitch+roll (2)
-        # critic also recieves gravity vector (3), base lin v (3), base angular v (3), base height (1), foot lin v (2 feet x 3), foot air time (2). Total 18.
-        self.critic_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 + 18
+        self.policy_observation_space_size = _N_JOINTS + _N_JOINTS + _N_TOUCH + 6 + 2 + _N_JOINTS # joint pos, joint vel, touch, imu (accelerometer (3) and gyroscope (3)), pitch+roll (2), prev commanded target
+        # critic sees a clean (noise-free) copy of the policy obs plus privileged
+        # extras: gravity vector (3), base lin v (3), base angular v (3), base
+        # height (1), foot lin v (2 feet x 3), foot air time (2). Total +18.
+        self.critic_observation_space_size = self.policy_observation_space_size + 18
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
@@ -259,6 +269,9 @@ class GnociGymEnv(gym.Env):
         self._action_buffer = deque([np.zeros(_N_JOINTS, dtype=np.float32)], maxlen=1)
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        # Rate-limiter state (see step()): starts at the actuators' initial
+        # commanded position so the first step isn't slew-limited relative to 0.
+        self._prev_target = self.data.ctrl.copy().astype(np.float32)
 
     def _build_model(self):
         """One-time model compile + cache. Not called on reset() — only the
@@ -425,10 +438,10 @@ class GnociGymEnv(gym.Env):
             *,
             survival_bonus=None,
             target_velocity=None,
-            target_velocity_band=None,
             foot_clearance_height=None,
             swing_time=None,
             kp=None,
+            max_actuator_velocity=None,
     ):
         """Update curriculum knobs mid-training.
 
@@ -439,19 +452,22 @@ class GnociGymEnv(gym.Env):
         ``kp`` re-baselines the actuator position gain (see _apply_kp); it
         takes effect on the next reset(), same as the other dynamics-
         randomization ranges, since _randomize_dynamics() only runs there.
+
+        ``max_actuator_velocity`` (see step()) is read directly every step, so
+        unlike ``kp`` it takes effect immediately, mid-episode included.
         """
         if survival_bonus is not None:
             self.survival_bonus = max(0.0, float(survival_bonus))
         if target_velocity is not None:
             self.target_velocity = max(0.0, float(target_velocity))
-        if target_velocity_band is not None:
-            self.target_velocity_band = max(0.0, float(target_velocity_band))
         if foot_clearance_height is not None:
             self.foot_clearance_height = max(0.0, float(foot_clearance_height))
         if swing_time is not None:
             self.swing_time = max(0.0, float(swing_time))
         if kp is not None:
             self._apply_kp(max(0.0, float(kp)))
+        if max_actuator_velocity is not None:
+            self.max_actuator_velocity = max(0.0, float(max_actuator_velocity))
 
     def _sample_push_interval(self):
         lo = int(self.push_interval_range[0] * self.control_hz)
@@ -478,6 +494,7 @@ class GnociGymEnv(gym.Env):
         self._foot_airtime = [0.0, 0.0]
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
+        self._prev_target = self.data.ctrl.copy().astype(np.float32)
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)
@@ -526,6 +543,7 @@ class GnociGymEnv(gym.Env):
             *gyro,
             *acc_filtered,
             *self._get_pitch_and_roll(gyro * 250, acc),
+            *self._prev_target,
         ])
         if self.obs_noise_level > 0:
             noise = np.random.uniform(-1, 1, obs.shape) * self._obs_noise_vec
@@ -650,22 +668,8 @@ class GnociGymEnv(gym.Env):
         # global direction — so turning to walk a curve/heading still earns
         # forward credit, rather than only ever crediting motion toward -Y.
         forward = float(np.dot(velocity[:2], self._get_body_forward_xy()))
-        target = self.target_velocity
-        if forward <= 0.0 or target <= 0.0:
-            # Exactly zero at (or below) zero forward speed — no deadband leak,
-            # so standing still earns nothing from velocity.
-            forward_reward = 0.0
-        elif forward < target:
-            # Linear ramp from 0 at v=0 to 1 at the (curriculum) target speed.
-            forward_reward = forward / target
-        else:
-            # At/above target: full credit within the band, fading beyond it.
-            forward_reward = tolerance(
-                forward,
-                bounds=(target, target + self.target_velocity_band),
-                margin=target,
-            )
-        return forward_reward
+        lin_vel_error = (self.target_velocity - forward) ** 2
+        return float(np.nan_to_num(np.exp(-lin_vel_error / TRACKING_SIGMA)))
 
     def _get_rotation_penalty_reward(self):
         # Squared yaw rate (rad/s) — same gyro axis the complementary filter
@@ -948,16 +952,26 @@ class GnociGymEnv(gym.Env):
                 self._push_interval = self._sample_push_interval()
 
         target_actions = []
+        max_step = self.max_actuator_velocity / self.control_hz
         for i in range(self.model.nu):
             # Absolute position control: action in [-1, 1] scales to a target
             # offset (in radians) from the joint's default pose (qpos == 0,
-            # see _set_joint_positions), then clips to the joint's range as a
-            # safety bound rather than an amplitude the policy is meant to hit.
+            # see _set_joint_positions). The raw target is then slew-rate
+            # limited to the actuator's max velocity (mirrors the physical
+            # servo, which can't jump instantly to a new position) before
+            # clipping to the joint's range as a safety bound rather than an
+            # amplitude the policy is meant to hit.
             filtered = self.action_filters[i].update(action[i])
             lo, hi = self.joint_ranges[i]
-            target = self.action_scale * filtered
-            self.data.ctrl[i] = float(np.clip(target, lo, hi))
-            target_actions.append(target.tolist())
+            raw_target = self.action_scale * filtered
+            new_target = np.clip(
+                raw_target,
+                self._prev_target[i] - max_step,
+                self._prev_target[i] + max_step,
+            )
+            self._prev_target[i] = new_target
+            self.data.ctrl[i] = float(np.clip(new_target, lo, hi))
+            target_actions.append(float(new_target))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
         noisey_state, state = self._get_obs()
