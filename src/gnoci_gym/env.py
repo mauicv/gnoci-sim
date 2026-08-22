@@ -119,7 +119,6 @@ def _build_obs_noise_vec(scales):
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
-    inertial_mass_noise=0.0,
     floor_tilt_range=0.0,
     floor_friction_range=(1.0, 1.0),
     joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
@@ -135,8 +134,9 @@ test_cfg = dict(
 
 dom_rnd_cfg = dict(
     initial_randomness=0.05,
-    inertial_mass_range=(0.02, 0.04),
-    inertial_mass_noise=0.01,
+    # widened from the old (0.02, 0.04) range to fold in what the removed
+    # inertial_mass_noise (std 0.01) used to contribute
+    inertial_mass_range=(0.01, 0.05),
     floor_tilt_range=0.02,
     floor_friction_range=(0.7, 1.3),
     # same relative spread the old ranges had around their (pre-sysid)
@@ -190,7 +190,6 @@ class GnociGymEnv(gym.Env):
         'max_actuator_velocity': _clamp_nonneg,
         'initial_randomness':    _clamp_nonneg,
         'inertial_mass_range':   _as_range,
-        'inertial_mass_noise':   _clamp_nonneg,
         'floor_tilt_range':      _clamp_nonneg,
         'floor_friction_range':  _as_range,
         'joint_friction_range':  _as_range,
@@ -211,8 +210,9 @@ class GnociGymEnv(gym.Env):
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
             initial_randomness=0.1,
-            inertial_mass_range=(0.04, 0.06),
-            inertial_mass_noise=0.03,
+            # widened from the old (0.04, 0.06) range to fold in what the
+            # removed inertial_mass_noise (std 0.03) used to contribute
+            inertial_mass_range=(0.0, 0.1),
             floor_tilt_range=0.0,
             floor_friction_range=(1.0, 1.0),
             joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
@@ -279,7 +279,6 @@ class GnociGymEnv(gym.Env):
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
-        self.inertial_mass_noise = inertial_mass_noise
         self.floor_tilt_range = floor_tilt_range
         self.floor_friction_range = floor_friction_range
         self.joint_friction_range = joint_friction_range
@@ -461,11 +460,7 @@ class GnociGymEnv(gym.Env):
         """Per-episode domain randomization, applied directly to the already-
         compiled model (no XML/recompile involved)."""
         for body_id in self._randomizable_body_ids:
-            scale = (
-                1.0
-                + np.random.uniform(*self.inertial_mass_range)
-                + np.random.normal(0, self.inertial_mass_noise)
-            )
+            scale = 1.0 + np.random.uniform(*self.inertial_mass_range)
             self.model.body_mass[body_id] = self._base_body_mass[body_id] * scale
             self.model.body_inertia[body_id] = self._base_body_inertia[body_id] * scale
 
