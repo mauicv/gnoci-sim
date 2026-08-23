@@ -132,6 +132,7 @@ test_cfg = dict(
     imu_bias_range=0.0,
     push_force_max=0.0,
     max_action_delay=0,
+    max_obs_delay=0,
 )
 
 dom_rnd_cfg = dict(
@@ -159,6 +160,7 @@ dom_rnd_cfg = dict(
     push_force_max=1.0,
     push_interval_range=(3.0, 6.0),
     max_action_delay=2,
+    max_obs_delay=2,
 )
 
 
@@ -211,6 +213,7 @@ class GnociGymEnv(gym.Env):
         'push_force_max':        _clamp_nonneg,
         'push_interval_range':   _as_range,
         'max_action_delay':      _clamp_nonneg_int,
+        'max_obs_delay':         _clamp_nonneg_int,
     }
 
     def __init__(
@@ -237,6 +240,7 @@ class GnociGymEnv(gym.Env):
             push_force_max=0.0,
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
+            max_obs_delay=0,
             action_filter_alpha=0.4,
             action_scale=0.25,
             task='stand',
@@ -313,6 +317,12 @@ class GnociGymEnv(gym.Env):
         self.push_force_max = push_force_max
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
+        # Same idea as max_action_delay but for the policy's (noisy) obs
+        # slice — see reset()/_get_obs(). The critic's clean_policy_obs is
+        # never delayed, only what the actor sees.
+        self.max_obs_delay = max_obs_delay
+        self._obs_delay = 0
+        self._obs_buffer = None
         self.action_filter_alpha = action_filter_alpha
         self.action_scale = action_scale
         self.fix_root_body = fix_root_body
@@ -626,6 +636,14 @@ class GnociGymEnv(gym.Env):
                 maxlen=self._action_delay + 1,
             )
 
+        # Fresh per-episode observation-delay length. Unlike the action
+        # buffer above, this isn't zero-filled here: there's no "no reading
+        # yet" placeholder that's physically meaningful for sensor data, so
+        # _get_obs() lazily seeds _obs_buffer with the real first reading
+        # (warm start) the first time it runs after this reset.
+        self._obs_delay = np.random.randint(0, self.max_obs_delay + 1) if self.max_obs_delay > 0 else 0
+        self._obs_buffer = None
+
         noisey_state, state = self._get_obs()
         return noisey_state, {'state': state}
 
@@ -712,6 +730,19 @@ class GnociGymEnv(gym.Env):
 
     def _get_obs(self):
         noise_policy_obs, clean_policy_obs = self._get_policy_obs()
+        if self.max_obs_delay > 0:
+            # Warm start: on the first call after reset() (see _obs_delay),
+            # seed the buffer with the real current reading rather than
+            # zeros, so a delayed episode doesn't start from a fake all-zero
+            # observation.
+            if self._obs_buffer is None:
+                self._obs_buffer = deque(
+                    [noise_policy_obs.copy()] * (self._obs_delay + 1),
+                    maxlen=self._obs_delay + 1,
+                )
+            else:
+                self._obs_buffer.append(noise_policy_obs.copy())
+            noise_policy_obs = self._obs_buffer[0]
         critic_only_obs = self._get_critic_only_obs()
 
         noisey_state = np.concatenate([noise_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
