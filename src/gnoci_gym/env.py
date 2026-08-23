@@ -119,6 +119,8 @@ def _build_obs_noise_vec(scales):
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
+    torso_com_offset_range=0.0,
+    torso_mass_range=(1.0, 1.0),
     floor_tilt_range=0.0,
     floor_friction_range=(1.0, 1.0),
     joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
@@ -137,6 +139,11 @@ dom_rnd_cfg = dict(
     # widened from the old (0.02, 0.04) range to fold in what the removed
     # inertial_mass_noise (std 0.01) used to contribute
     inertial_mass_range=(0.01, 0.05),
+    # torso (head_base) CoM position uncertainty (battery/wiring/mounting
+    # placement) and mass uncertainty, wider than the generic per-body
+    # inertial_mass_range since payload variation concentrates there
+    torso_com_offset_range=0.012,  # metres, +/- per axis (~12mm)
+    torso_mass_range=(0.85, 1.15),
     floor_tilt_range=0.02,
     floor_friction_range=(0.7, 1.3),
     # same relative spread the old ranges had around their (pre-sysid)
@@ -190,6 +197,8 @@ class GnociGymEnv(gym.Env):
         'max_actuator_velocity': _clamp_nonneg,
         'initial_randomness':    _clamp_nonneg,
         'inertial_mass_range':   _as_range,
+        'torso_com_offset_range': _clamp_nonneg,
+        'torso_mass_range':      _as_range,
         'floor_tilt_range':      _clamp_nonneg,
         'floor_friction_range':  _as_range,
         'joint_friction_range':  _as_range,
@@ -213,6 +222,8 @@ class GnociGymEnv(gym.Env):
             # widened from the old (0.04, 0.06) range to fold in what the
             # removed inertial_mass_noise (std 0.03) used to contribute
             inertial_mass_range=(0.0, 0.1),
+            torso_com_offset_range=0.0,
+            torso_mass_range=(1.0, 1.0),
             floor_tilt_range=0.0,
             floor_friction_range=(1.0, 1.0),
             joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
@@ -279,6 +290,8 @@ class GnociGymEnv(gym.Env):
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
+        self.torso_com_offset_range = torso_com_offset_range
+        self.torso_mass_range = torso_mass_range
         self.floor_tilt_range = floor_tilt_range
         self.floor_friction_range = floor_friction_range
         self.joint_friction_range = joint_friction_range
@@ -412,7 +425,16 @@ class GnociGymEnv(gym.Env):
         # already-randomized values.
         self._base_body_mass = self.model.body_mass.copy()
         self._base_body_inertia = self.model.body_inertia.copy()
+        self._base_body_ipos = self.model.body_ipos.copy()
+        # Torso (self.body_id) is excluded here since it gets its own,
+        # separately-ranged randomization below (torso_mass_range /
+        # torso_com_offset_range) — including it in both would mean
+        # inertial_mass_range's contribution to the torso is silently
+        # overwritten and wasted.
         self._randomizable_body_ids = np.nonzero(self._base_body_mass > 0)[0]
+        self._randomizable_body_ids = self._randomizable_body_ids[
+            self._randomizable_body_ids != self.body_id
+        ]
         self._base_actuator_gainprm = self.model.actuator_gainprm.copy()
         self._base_actuator_biasprm = self.model.actuator_biasprm.copy()
         self._apply_kp(self.kp)
@@ -490,6 +512,21 @@ class GnociGymEnv(gym.Env):
 
         if self.gravity_noise > 0:
             self.model.opt.gravity[2] = self._base_gravity_z + np.random.normal(0, self.gravity_noise)
+
+        # Torso (head_base) CoM offset + mass — excluded from the generic
+        # inertial_mass_range loop above and randomized with its own, wider
+        # range since payload/wiring placement uncertainty concentrates in
+        # the main body. body_inertia is rescaled by the same mass factor to
+        # stay physically consistent (density-preserving approximation,
+        # ignores the CoM shift's effect via the parallel axis theorem —
+        # fine for domain randomization).
+        torso_id = self.body_id
+        self.model.body_ipos[torso_id] = self._base_body_ipos[torso_id] + np.random.uniform(
+            -self.torso_com_offset_range, self.torso_com_offset_range, 3
+        )
+        torso_mass_scale = np.random.uniform(*self.torso_mass_range)
+        self.model.body_mass[torso_id] = self._base_body_mass[torso_id] * torso_mass_scale
+        self.model.body_inertia[torso_id] = self._base_body_inertia[torso_id] * torso_mass_scale
 
         # Recompute compile-time-derived constants (e.g. body/dof invweight)
         # that depend on the mass/inertia values just edited above. Far
