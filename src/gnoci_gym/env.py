@@ -126,7 +126,11 @@ test_cfg = dict(
     joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
     joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
     joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
+    # actuator_gain_range already scales kp (gainprm[0]/biasprm[1]) by a
+    # percentage of its size each reset; kv_range does the same for kv
+    # (biasprm[2]), independently — see _randomize_dynamics().
     actuator_gain_range=(1.0, 1.0),
+    kv_range=(1.0, 1.0),
     gravity_noise=0.0,
     obs_noise_level=0.0,
     imu_bias_range=0.0,
@@ -154,6 +158,7 @@ dom_rnd_cfg = dict(
     joint_armature_range=(0.8 * SYSID_JOINT_ARMATURE, 1.6 * SYSID_JOINT_ARMATURE),
     joint_damping_range=(0.7 * SYSID_JOINT_DAMPING, 1.5 * SYSID_JOINT_DAMPING),
     actuator_gain_range=(0.9, 1.1),
+    kv_range=(0.9, 1.1),
     gravity_noise=0.1,
     obs_noise_level=1.0,
     imu_bias_range=3.0,
@@ -207,6 +212,7 @@ class GnociGymEnv(gym.Env):
         'joint_armature_range':  _as_range,
         'joint_damping_range':   _as_range,
         'actuator_gain_range':   _as_range,
+        'kv_range':              _as_range,
         'gravity_noise':         _clamp_nonneg,
         'obs_noise_level':       _clamp_nonneg,
         'imu_bias_range':        _clamp_nonneg,
@@ -233,6 +239,7 @@ class GnociGymEnv(gym.Env):
             joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
             joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
             actuator_gain_range=(1.0, 1.0),
+            kv_range=(1.0, 1.0),
             gravity_noise=0.0,
             obs_noise_level=0.0,
             obs_noise_scales=None,
@@ -302,6 +309,7 @@ class GnociGymEnv(gym.Env):
         self.joint_armature_range = joint_armature_range
         self.joint_damping_range = joint_damping_range
         self.actuator_gain_range = actuator_gain_range
+        self.kv_range = kv_range
         self.gravity_noise = gravity_noise
         self.obs_noise_level = obs_noise_level
         self.obs_noise_scales = {**OBS_NOISE_SCALES, **(obs_noise_scales or {})}
@@ -472,21 +480,19 @@ class GnociGymEnv(gym.Env):
     def _apply_kp(self, kp):
         """(Re-)baseline the actuators' position gain that _randomize_dynamics()
         scales by actuator_gain_range each reset. biasprm[1] is the matching
-        position term (-kp); the velocity term (biasprm[2], set at compile time
-        from the XML's dampratio) is left untouched, same as _randomize_dynamics
-        does when it scales gainprm/biasprm[1] by actuator_gain_range."""
+        position term (-kp); see _apply_kv() for the velocity term
+        (biasprm[2]/kv), baselined and randomized the same way."""
         self.kp = float(kp)
         self._base_actuator_gainprm[:, 0] = self.kp
         self._base_actuator_biasprm[:, 1] = -self.kp
 
     def _apply_kv(self, kv):
         """(Re-)baseline the actuators' velocity gain — biasprm[2], the
-        position servo's damping term. Unlike kp/biasprm[1], nothing in
-        _randomize_dynamics() rewrites this index each reset (actuator_gain_range
-        only scales gainprm[0]/biasprm[1]), so this stamps the live model
-        directly and takes effect immediately, not just on the next reset()."""
+        position servo's damping term. Mirrors _apply_kp(): writes the base
+        array that _randomize_dynamics() scales by kv_range each reset, so
+        (like kp) this takes effect on the next reset(), not immediately."""
         self.kv = float(kv)
-        self.model.actuator_biasprm[:, 2] = -self.kv
+        self._base_actuator_biasprm[:, 2] = -self.kv
 
     def _randomize_dynamics(self):
         """Per-episode domain randomization, applied directly to the already-
@@ -516,9 +522,15 @@ class GnociGymEnv(gym.Env):
             self.model.dof_damping[dof_addr] = np.random.uniform(*self.joint_damping_range)
 
         for i in range(self.model.nu):
-            scale = np.random.uniform(*self.actuator_gain_range)
-            self.model.actuator_gainprm[i, 0] = self._base_actuator_gainprm[i, 0] * scale
-            self.model.actuator_biasprm[i, 1] = self._base_actuator_biasprm[i, 1] * scale
+            # kp (gainprm[0]/biasprm[1]) and kv (biasprm[2]) each get their
+            # own independent per-episode scale — actuator_gain_range for kp,
+            # kv_range for kv — rather than sharing one draw, since gain and
+            # damping uncertainty need not track each other.
+            kp_scale = np.random.uniform(*self.actuator_gain_range)
+            self.model.actuator_gainprm[i, 0] = self._base_actuator_gainprm[i, 0] * kp_scale
+            self.model.actuator_biasprm[i, 1] = self._base_actuator_biasprm[i, 1] * kp_scale
+            kv_scale = np.random.uniform(*self.kv_range)
+            self.model.actuator_biasprm[i, 2] = self._base_actuator_biasprm[i, 2] * kv_scale
 
         if self.gravity_noise > 0:
             self.model.opt.gravity[2] = self._base_gravity_z + np.random.normal(0, self.gravity_noise)
@@ -574,14 +586,14 @@ class GnociGymEnv(gym.Env):
         ``__init__`` params) plus ``kp``/``kv``; unset or ``None`` values are
         left unchanged, and an unknown keyword raises ``TypeError``.
 
-        ``kp`` and the dom-rand ranges (``inertial_mass_range``,
-        ``floor_friction_range``, ``joint_damping_range``, etc.) re-baseline
-        knobs that _randomize_dynamics() only reads at reset() time, so they
-        take effect on the next reset(), not mid-episode.
+        ``kp``/``kv`` and the dom-rand ranges (``inertial_mass_range``,
+        ``floor_friction_range``, ``joint_damping_range``, ``kv_range``,
+        etc.) re-baseline knobs that _randomize_dynamics() only reads at
+        reset() time, so they take effect on the next reset(), not
+        mid-episode.
 
-        ``kv`` and ``max_actuator_velocity`` (see step()) are stamped/read
-        directly, so unlike those they take effect immediately, mid-episode
-        included.
+        ``max_actuator_velocity`` (see step()) is read directly every step,
+        so unlike those it takes effect immediately, mid-episode included.
         """
         unknown = kwargs.keys() - self._CURRICULUM_CASTERS.keys()
         if unknown:
