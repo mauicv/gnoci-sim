@@ -905,18 +905,21 @@ class GnociGymEnv(gym.Env):
         """Dense single-support swing-quality reward.
 
         For whichever foot is airborne while the other is planted, credit is
-        the product of two fractions, each ramping linearly from 0 and
-        holding at 1 past its cap: how far into the target swing duration
-        (self.swing_time) the current continuous airtime is, and how close
-        to the target swing height (self.foot_clearance_height) the foot
-        currently is. Multiplying the two means neither a long-but-flat lift
-        nor a high-but-momentary tap earns much on its own — both a real
-        duration and a real height are required together. Both caps are
-        plain attributes (rather than module constants) so they can be
+        the product of two fractions: how far into the target swing duration
+        (self.swing_time) the current continuous airtime is (ramping linearly
+        from 0, then dropping to 0 once airtime exceeds swing_time — no
+        credit for dawdling past the target duration), and how close to the
+        target swing height (self.foot_clearance_height) the foot currently
+        is (ramping linearly from 0 and holding at 1 past its cap).
+        Multiplying the two means neither a long-but-flat lift nor a
+        high-but-momentary tap earns much on its own — both a real duration
+        and a real height are required together. Both caps are plain
+        attributes (rather than module constants) so they can be
         curriculum-annealed via set_curriculum().
 
-        0 during double support and while both feet are airborne at once
-        (no single-support foot to credit, e.g. a hop/stumble).
+        0 during double support, while both feet are airborne at once (no
+        single-support foot to credit, e.g. a hop/stumble), and once a swing
+        has overrun swing_time.
         """
         dt = 1.0 / self.control_hz
         contacts = self._contact_states
@@ -937,7 +940,9 @@ class GnociGymEnv(gym.Env):
             self._foot_airtime[i] += dt
             if not in_contact[other] or self.swing_time <= 0.0 or self.foot_clearance_height <= 0.0:
                 continue
-            time_frac = min(1.0, self._foot_airtime[i] / self.swing_time)
+            time_frac = self._foot_airtime[i] / self.swing_time
+            if time_frac > 1.0:
+                continue
             height_frac = min(1.0, max(0.0, foot_z[i]) / self.foot_clearance_height)
             reward += time_frac * height_frac
         return reward
