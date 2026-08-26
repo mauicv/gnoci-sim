@@ -38,6 +38,11 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
+# Offset of the [pitch, roll] pair within the policy obs, matching the
+# concatenation order _get_policy_obs() builds: joint_pos, joint_vel,
+# contacts, gyro(3), acc(3), then pitch/roll.
+_PITCH_ROLL_OBS_OFFSET = 2 * _N_JOINTS + _N_TOUCH + 6
+
 PHYSICS_DT    = 0.002   # MuJoCo integration timestep (500 Hz)
 _CONTACT_DEBOUNCE_PERIOD = 0.05  # seconds — a contact change must persist this long to register
 # Hysteresis thresholds (N) mimicking the limit switches' actuation/release
@@ -54,13 +59,14 @@ IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
 # Sysid-derived per-joint dynamics — must stay equal to the frictionloss /
-# armature attributes on the named joints in desc/gnoci.xml. They have to be
-# threaded through here because _randomize_dynamics() stamps
-# dof_frictionloss/dof_armature on every reset, so the MJCF values alone
-# never survive past construction.
+# armature / damping attributes on the named joints in desc/gnoci.xml. They
+# have to be threaded through here because _randomize_dynamics() stamps
+# dof_frictionloss/dof_armature/dof_damping on every reset, so the MJCF
+# values alone never survive past construction.
 
 SYSID_JOINT_FRICTIONLOSS = 0.006426057652042094
 SYSID_JOINT_ARMATURE     = 0.012995945315907826
+SYSID_JOINT_DAMPING      = 0.17889452739994438
 
 # Per-sensor observation noise scales, in raw sensor units (rad, rad/s, m/s²).
 # Sampled uniform(-scale, scale) and converted into obs units with the same
@@ -75,6 +81,19 @@ OBS_NOISE_SCALES = dict(
     gyro=0.5,       # rad/s
     accelerometer=0.075,  # m/s²
 )
+
+
+def _clamp_nonneg(value):
+    return max(0.0, float(value))
+
+
+def _clamp_nonneg_int(value):
+    return max(0, int(value))
+
+
+def _as_range(value):
+    lo, hi = value
+    return (float(lo), float(hi))
 
 
 def _build_obs_noise_vec(scales):
@@ -100,34 +119,53 @@ def _build_obs_noise_vec(scales):
 test_cfg = dict(
     initial_randomness=0.0,
     inertial_mass_range=(0.0, 0.0),
-    inertial_mass_noise=0.0,
+    torso_com_offset_range=0.0,
+    torso_mass_range=(1.0, 1.0),
     floor_tilt_range=0.0,
     floor_friction_range=(1.0, 1.0),
     joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
     joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
+    joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
+    # actuator_gain_range already scales kp (gainprm[0]/biasprm[1]) by a
+    # percentage of its size each reset; kv_range does the same for kv
+    # (biasprm[2]), independently — see _randomize_dynamics().
     actuator_gain_range=(1.0, 1.0),
+    kv_range=(1.0, 1.0),
     gravity_noise=0.0,
     obs_noise_level=0.0,
+    imu_bias_range=0.0,
     push_force_max=0.0,
     max_action_delay=0,
+    max_obs_delay=0,
 )
 
 dom_rnd_cfg = dict(
     initial_randomness=0.05,
-    inertial_mass_range=(0.02, 0.04),
-    inertial_mass_noise=0.01,
+    # widened from the old (0.02, 0.04) range to fold in what the removed
+    # inertial_mass_noise (std 0.01) used to contribute
+    inertial_mass_range=(0.01, 0.05),
+    # torso (head_base) CoM position uncertainty (battery/wiring/mounting
+    # placement) and mass uncertainty, wider than the generic per-body
+    # inertial_mass_range since payload variation concentrates there
+    torso_com_offset_range=0.012,  # metres, +/- per axis (~12mm)
+    torso_mass_range=(0.85, 1.15),
     floor_tilt_range=0.02,
     floor_friction_range=(0.7, 1.3),
     # same relative spread the old ranges had around their (pre-sysid)
-    # nominals: friction x0.7-1.5, armature x0.8-1.6
+    # nominals: friction x0.7-1.5, armature x0.8-1.6; damping mirrors the
+    # friction spread since it's likewise a passive resistive term
     joint_friction_range=(0.7 * SYSID_JOINT_FRICTIONLOSS, 1.5 * SYSID_JOINT_FRICTIONLOSS),
     joint_armature_range=(0.8 * SYSID_JOINT_ARMATURE, 1.6 * SYSID_JOINT_ARMATURE),
+    joint_damping_range=(0.7 * SYSID_JOINT_DAMPING, 1.5 * SYSID_JOINT_DAMPING),
     actuator_gain_range=(0.9, 1.1),
+    kv_range=(0.9, 1.1),
     gravity_noise=0.1,
     obs_noise_level=1.0,
+    imu_bias_range=3.0,
     push_force_max=1.0,
     push_interval_range=(3.0, 6.0),
-    max_action_delay=1,
+    max_action_delay=2,
+    max_obs_delay=2,
 )
 
 
@@ -151,25 +189,65 @@ class GnociGymEnv(gym.Env):
         'action_rate': 0.02,
     }
 
+    # Curriculum knobs set_curriculum() can update mid-training, mapped to
+    # the caster applied to each new value before setattr. Scalars are
+    # clamped to >= 0 since they're all physical magnitudes (noise scales,
+    # gains, counts, seconds); *_range tuples are just type-coerced, same as
+    # __init__ takes them (no clamping there either). ``kp``/``kv`` are
+    # handled separately in set_curriculum() since they need _apply_kp() /
+    # _apply_kv(), not a plain setattr.
+    _CURRICULUM_CASTERS = {
+        'survival_bonus':        _clamp_nonneg,
+        'target_velocity':       _clamp_nonneg,
+        'foot_clearance_height': _clamp_nonneg,
+        'swing_time':            _clamp_nonneg,
+        'max_actuator_velocity': _clamp_nonneg,
+        'initial_randomness':    _clamp_nonneg,
+        'inertial_mass_range':   _as_range,
+        'torso_com_offset_range': _clamp_nonneg,
+        'torso_mass_range':      _as_range,
+        'floor_tilt_range':      _clamp_nonneg,
+        'floor_friction_range':  _as_range,
+        'joint_friction_range':  _as_range,
+        'joint_armature_range':  _as_range,
+        'joint_damping_range':   _as_range,
+        'actuator_gain_range':   _as_range,
+        'kv_range':              _as_range,
+        'gravity_noise':         _clamp_nonneg,
+        'obs_noise_level':       _clamp_nonneg,
+        'imu_bias_range':        _clamp_nonneg,
+        'push_force_max':        _clamp_nonneg,
+        'push_interval_range':   _as_range,
+        'max_action_delay':      _clamp_nonneg_int,
+        'max_obs_delay':         _clamp_nonneg_int,
+    }
+
     def __init__(
             self,
             camera='track',
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
             initial_randomness=0.1,
-            inertial_mass_range=(0.04, 0.06),
-            inertial_mass_noise=0.03,
+            # widened from the old (0.04, 0.06) range to fold in what the
+            # removed inertial_mass_noise (std 0.03) used to contribute
+            inertial_mass_range=(0.0, 0.1),
+            torso_com_offset_range=0.0,
+            torso_mass_range=(1.0, 1.0),
             floor_tilt_range=0.0,
             floor_friction_range=(1.0, 1.0),
             joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
             joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
+            joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
             actuator_gain_range=(1.0, 1.0),
+            kv_range=(1.0, 1.0),
             gravity_noise=0.0,
             obs_noise_level=0.0,
             obs_noise_scales=None,
+            imu_bias_range=3.0,
             push_force_max=0.0,
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
+            max_obs_delay=0,
             action_filter_alpha=0.4,
             action_scale=0.25,
             task='stand',
@@ -180,6 +258,7 @@ class GnociGymEnv(gym.Env):
             foot_clearance_height=0.04,
             swing_time=0.4,
             kp=25.0,
+            kv=None,
             max_actuator_velocity=6.5,
         ):
         # Curriculum-controlled knobs. These are plain attributes so an external
@@ -202,6 +281,13 @@ class GnociGymEnv(gym.Env):
         # 50). Kept as an attribute so it can be re-baselined via set_curriculum();
         # _apply_kp() is (re-)applied in _build_model() once the model compiles.
         self.kp = float(kp)
+        # Actuator velocity gain (the position servo's damping term, biasprm[2]).
+        # None (default) means "keep whatever the XML's dampratio compiled to" —
+        # unlike kp there's no separately-tuned override value, so _build_model()
+        # reads the compiled value back into self.kv rather than stamping one.
+        # Passing a value (here or via set_curriculum) re-baselines it via
+        # _apply_kv(), same mechanism as kp/_apply_kp().
+        self.kv = None if kv is None else float(kv)
         # Actuator slew-rate limit (rad/s), applied in step() to the commanded
         # target before it reaches the position servo. Default is the
         # miuzei_25kg no-load speed rating (~0.16s/60°  ~6.5 rad/s).
@@ -215,19 +301,36 @@ class GnociGymEnv(gym.Env):
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
         self.initial_randomness = initial_randomness
         self.inertial_mass_range = inertial_mass_range
-        self.inertial_mass_noise = inertial_mass_noise
+        self.torso_com_offset_range = torso_com_offset_range
+        self.torso_mass_range = torso_mass_range
         self.floor_tilt_range = floor_tilt_range
         self.floor_friction_range = floor_friction_range
         self.joint_friction_range = joint_friction_range
         self.joint_armature_range = joint_armature_range
+        self.joint_damping_range = joint_damping_range
         self.actuator_gain_range = actuator_gain_range
+        self.kv_range = kv_range
         self.gravity_noise = gravity_noise
         self.obs_noise_level = obs_noise_level
         self.obs_noise_scales = {**OBS_NOISE_SCALES, **(obs_noise_scales or {})}
         self._obs_noise_vec = _build_obs_noise_vec(self.obs_noise_scales)
+        # Symmetric bound (degrees) on a fixed per-episode IMU pitch/roll
+        # miscalibration bias, mimicking a real IMU's fixed mounting offset
+        # rather than the per-step gravity noise above. Resampled once each
+        # reset() (see self._imu_bias) and added on top of that noise in
+        # _get_policy_obs() — only to the noisy policy obs, never to the
+        # clean copy the critic sees.
+        self.imu_bias_range = float(imu_bias_range)
+        self._imu_bias = np.zeros(2, dtype=np.float32)
         self.push_force_max = push_force_max
         self.push_interval_range = push_interval_range
         self.max_action_delay = max_action_delay
+        # Same idea as max_action_delay but for the policy's (noisy) obs
+        # slice — see reset()/_get_obs(). The critic's clean_policy_obs is
+        # never delayed, only what the actor sees.
+        self.max_obs_delay = max_obs_delay
+        self._obs_delay = 0
+        self._obs_buffer = None
         self.action_filter_alpha = action_filter_alpha
         self.action_scale = action_scale
         self.fix_root_body = fix_root_body
@@ -340,10 +443,25 @@ class GnociGymEnv(gym.Env):
         # already-randomized values.
         self._base_body_mass = self.model.body_mass.copy()
         self._base_body_inertia = self.model.body_inertia.copy()
+        self._base_body_ipos = self.model.body_ipos.copy()
+        # Torso (self.body_id) is excluded here since it gets its own,
+        # separately-ranged randomization below (torso_mass_range /
+        # torso_com_offset_range) — including it in both would mean
+        # inertial_mass_range's contribution to the torso is silently
+        # overwritten and wasted.
         self._randomizable_body_ids = np.nonzero(self._base_body_mass > 0)[0]
+        self._randomizable_body_ids = self._randomizable_body_ids[
+            self._randomizable_body_ids != self.body_id
+        ]
         self._base_actuator_gainprm = self.model.actuator_gainprm.copy()
         self._base_actuator_biasprm = self.model.actuator_biasprm.copy()
         self._apply_kp(self.kp)
+        if self.kv is None:
+            # No override given: read back whatever the XML's dampratio
+            # compiled biasprm[2] to, so self.kv reflects the live value.
+            self.kv = float(-self.model.actuator_biasprm[0, 2])
+        else:
+            self._apply_kv(self.kv)
         self._base_gravity_z = float(self.model.opt.gravity[2])
 
         self.comp_filter = ComplementaryFilter()
@@ -362,22 +480,25 @@ class GnociGymEnv(gym.Env):
     def _apply_kp(self, kp):
         """(Re-)baseline the actuators' position gain that _randomize_dynamics()
         scales by actuator_gain_range each reset. biasprm[1] is the matching
-        position term (-kp); the velocity term (biasprm[2], set at compile time
-        from the XML's dampratio) is left untouched, same as _randomize_dynamics
-        does when it scales gainprm/biasprm[1] by actuator_gain_range."""
+        position term (-kp); see _apply_kv() for the velocity term
+        (biasprm[2]/kv), baselined and randomized the same way."""
         self.kp = float(kp)
         self._base_actuator_gainprm[:, 0] = self.kp
         self._base_actuator_biasprm[:, 1] = -self.kp
+
+    def _apply_kv(self, kv):
+        """(Re-)baseline the actuators' velocity gain — biasprm[2], the
+        position servo's damping term. Mirrors _apply_kp(): writes the base
+        array that _randomize_dynamics() scales by kv_range each reset, so
+        (like kp) this takes effect on the next reset(), not immediately."""
+        self.kv = float(kv)
+        self._base_actuator_biasprm[:, 2] = -self.kv
 
     def _randomize_dynamics(self):
         """Per-episode domain randomization, applied directly to the already-
         compiled model (no XML/recompile involved)."""
         for body_id in self._randomizable_body_ids:
-            scale = (
-                1.0
-                + np.random.uniform(*self.inertial_mass_range)
-                + np.random.normal(0, self.inertial_mass_noise)
-            )
+            scale = 1.0 + np.random.uniform(*self.inertial_mass_range)
             self.model.body_mass[body_id] = self._base_body_mass[body_id] * scale
             self.model.body_inertia[body_id] = self._base_body_inertia[body_id] * scale
 
@@ -398,14 +519,36 @@ class GnociGymEnv(gym.Env):
         for dof_addr in self.joint_dof_addrs:
             self.model.dof_frictionloss[dof_addr] = np.random.uniform(*self.joint_friction_range)
             self.model.dof_armature[dof_addr] = np.random.uniform(*self.joint_armature_range)
+            self.model.dof_damping[dof_addr] = np.random.uniform(*self.joint_damping_range)
 
         for i in range(self.model.nu):
-            scale = np.random.uniform(*self.actuator_gain_range)
-            self.model.actuator_gainprm[i, 0] = self._base_actuator_gainprm[i, 0] * scale
-            self.model.actuator_biasprm[i, 1] = self._base_actuator_biasprm[i, 1] * scale
+            # kp (gainprm[0]/biasprm[1]) and kv (biasprm[2]) each get their
+            # own independent per-episode scale — actuator_gain_range for kp,
+            # kv_range for kv — rather than sharing one draw, since gain and
+            # damping uncertainty need not track each other.
+            kp_scale = np.random.uniform(*self.actuator_gain_range)
+            self.model.actuator_gainprm[i, 0] = self._base_actuator_gainprm[i, 0] * kp_scale
+            self.model.actuator_biasprm[i, 1] = self._base_actuator_biasprm[i, 1] * kp_scale
+            kv_scale = np.random.uniform(*self.kv_range)
+            self.model.actuator_biasprm[i, 2] = self._base_actuator_biasprm[i, 2] * kv_scale
 
         if self.gravity_noise > 0:
             self.model.opt.gravity[2] = self._base_gravity_z + np.random.normal(0, self.gravity_noise)
+
+        # Torso (head_base) CoM offset + mass — excluded from the generic
+        # inertial_mass_range loop above and randomized with its own, wider
+        # range since payload/wiring placement uncertainty concentrates in
+        # the main body. body_inertia is rescaled by the same mass factor to
+        # stay physically consistent (density-preserving approximation,
+        # ignores the CoM shift's effect via the parallel axis theorem —
+        # fine for domain randomization).
+        torso_id = self.body_id
+        self.model.body_ipos[torso_id] = self._base_body_ipos[torso_id] + np.random.uniform(
+            -self.torso_com_offset_range, self.torso_com_offset_range, 3
+        )
+        torso_mass_scale = np.random.uniform(*self.torso_mass_range)
+        self.model.body_mass[torso_id] = self._base_body_mass[torso_id] * torso_mass_scale
+        self.model.body_inertia[torso_id] = self._base_body_inertia[torso_id] * torso_mass_scale
 
         # Recompute compile-time-derived constants (e.g. body/dof invweight)
         # that depend on the mass/inertia values just edited above. Far
@@ -433,41 +576,37 @@ class GnociGymEnv(gym.Env):
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
-    def set_curriculum(
-            self,
-            *,
-            survival_bonus=None,
-            target_velocity=None,
-            foot_clearance_height=None,
-            swing_time=None,
-            kp=None,
-            max_actuator_velocity=None,
-    ):
-        """Update curriculum knobs mid-training.
+    def set_curriculum(self, *, kp=None, kv=None, **kwargs):
+        """Update curriculum / domain-randomization knobs mid-training.
 
         Intended to be driven by the trainer (e.g. via SB3 ``env_method``) to
-        anneal the standing floor and exploration noise away while ramping the
-        forward-speed target up. Only provided values are changed.
+        anneal the standing floor and exploration noise away while ramping
+        the forward-speed target and dom-rand ranges up. Accepts any of the
+        keys in ``_CURRICULUM_CASTERS`` (the same names as the matching
+        ``__init__`` params) plus ``kp``/``kv``; unset or ``None`` values are
+        left unchanged, and an unknown keyword raises ``TypeError``.
 
-        ``kp`` re-baselines the actuator position gain (see _apply_kp); it
-        takes effect on the next reset(), same as the other dynamics-
-        randomization ranges, since _randomize_dynamics() only runs there.
+        ``kp``/``kv`` and the dom-rand ranges (``inertial_mass_range``,
+        ``floor_friction_range``, ``joint_damping_range``, ``kv_range``,
+        etc.) re-baseline knobs that _randomize_dynamics() only reads at
+        reset() time, so they take effect on the next reset(), not
+        mid-episode.
 
-        ``max_actuator_velocity`` (see step()) is read directly every step, so
-        unlike ``kp`` it takes effect immediately, mid-episode included.
+        ``max_actuator_velocity`` (see step()) is read directly every step,
+        so unlike those it takes effect immediately, mid-episode included.
         """
-        if survival_bonus is not None:
-            self.survival_bonus = max(0.0, float(survival_bonus))
-        if target_velocity is not None:
-            self.target_velocity = max(0.0, float(target_velocity))
-        if foot_clearance_height is not None:
-            self.foot_clearance_height = max(0.0, float(foot_clearance_height))
-        if swing_time is not None:
-            self.swing_time = max(0.0, float(swing_time))
+        unknown = kwargs.keys() - self._CURRICULUM_CASTERS.keys()
+        if unknown:
+            raise TypeError(
+                f"set_curriculum() got unexpected keyword argument(s): {sorted(unknown)}"
+            )
+        for name, value in kwargs.items():
+            if value is not None:
+                setattr(self, name, self._CURRICULUM_CASTERS[name](value))
         if kp is not None:
-            self._apply_kp(max(0.0, float(kp)))
-        if max_actuator_velocity is not None:
-            self.max_actuator_velocity = max(0.0, float(max_actuator_velocity))
+            self._apply_kp(_clamp_nonneg(kp))
+        if kv is not None:
+            self._apply_kv(_clamp_nonneg(kv))
 
     def _sample_push_interval(self):
         lo = int(self.push_interval_range[0] * self.control_hz)
@@ -484,6 +623,12 @@ class GnociGymEnv(gym.Env):
         self.comp_filter.reset()
         for f in self.acc_filters + self.joint_vel_filters:
             f.reset()
+        # Fresh per-episode [pitch, roll] miscalibration bias (see
+        # imu_bias_range), converted from degrees into the same units
+        # ComplementaryFilter.pitch/roll are expressed in (degrees / 180).
+        self._imu_bias = (
+            np.random.uniform(-self.imu_bias_range, self.imu_bias_range, size=2) / 180.0
+        ).astype(np.float32)
         self.done = False
 
         self._push_step = 0
@@ -502,6 +647,14 @@ class GnociGymEnv(gym.Env):
                 [np.zeros(_N_JOINTS, dtype=np.float32)] * (self._action_delay + 1),
                 maxlen=self._action_delay + 1,
             )
+
+        # Fresh per-episode observation-delay length. Unlike the action
+        # buffer above, this isn't zero-filled here: there's no "no reading
+        # yet" placeholder that's physically meaningful for sensor data, so
+        # _get_obs() lazily seeds _obs_buffer with the real first reading
+        # (warm start) the first time it runs after this reset.
+        self._obs_delay = np.random.randint(0, self.max_obs_delay + 1) if self.max_obs_delay > 0 else 0
+        self._obs_buffer = None
 
         noisey_state, state = self._get_obs()
         return noisey_state, {'state': state}
@@ -549,7 +702,10 @@ class GnociGymEnv(gym.Env):
             noise = np.random.uniform(-1, 1, obs.shape) * self._obs_noise_vec
             noisey_obs = obs + self.obs_noise_level * noise
         else:
-            noisey_obs = obs
+            noisey_obs = obs.copy()
+        # Per-episode IMU bias (see reset()) — added after the per-step noise,
+        # only to the pitch/roll pair of the noisy obs the policy sees.
+        noisey_obs[_PITCH_ROLL_OBS_OFFSET:_PITCH_ROLL_OBS_OFFSET + 2] += self._imu_bias
         return noisey_obs.astype(np.float32), obs.astype(np.float32)
 
     def _get_critic_only_obs(self):
@@ -586,6 +742,19 @@ class GnociGymEnv(gym.Env):
 
     def _get_obs(self):
         noise_policy_obs, clean_policy_obs = self._get_policy_obs()
+        if self.max_obs_delay > 0:
+            # Warm start: on the first call after reset() (see _obs_delay),
+            # seed the buffer with the real current reading rather than
+            # zeros, so a delayed episode doesn't start from a fake all-zero
+            # observation.
+            if self._obs_buffer is None:
+                self._obs_buffer = deque(
+                    [noise_policy_obs.copy()] * (self._obs_delay + 1),
+                    maxlen=self._obs_delay + 1,
+                )
+            else:
+                self._obs_buffer.append(noise_policy_obs.copy())
+            noise_policy_obs = self._obs_buffer[0]
         critic_only_obs = self._get_critic_only_obs()
 
         noisey_state = np.concatenate([noise_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
@@ -748,18 +917,21 @@ class GnociGymEnv(gym.Env):
         """Dense single-support swing-quality reward.
 
         For whichever foot is airborne while the other is planted, credit is
-        the product of two fractions, each ramping linearly from 0 and
-        holding at 1 past its cap: how far into the target swing duration
-        (self.swing_time) the current continuous airtime is, and how close
-        to the target swing height (self.foot_clearance_height) the foot
-        currently is. Multiplying the two means neither a long-but-flat lift
-        nor a high-but-momentary tap earns much on its own — both a real
-        duration and a real height are required together. Both caps are
-        plain attributes (rather than module constants) so they can be
+        the product of two fractions: how far into the target swing duration
+        (self.swing_time) the current continuous airtime is (ramping linearly
+        from 0, then dropping to 0 once airtime exceeds swing_time — no
+        credit for dawdling past the target duration), and how close to the
+        target swing height (self.foot_clearance_height) the foot currently
+        is (ramping linearly from 0 and holding at 1 past its cap).
+        Multiplying the two means neither a long-but-flat lift nor a
+        high-but-momentary tap earns much on its own — both a real duration
+        and a real height are required together. Both caps are plain
+        attributes (rather than module constants) so they can be
         curriculum-annealed via set_curriculum().
 
-        0 during double support and while both feet are airborne at once
-        (no single-support foot to credit, e.g. a hop/stumble).
+        0 during double support, while both feet are airborne at once (no
+        single-support foot to credit, e.g. a hop/stumble), and once a swing
+        has overrun swing_time.
         """
         dt = 1.0 / self.control_hz
         contacts = self._contact_states
@@ -780,7 +952,9 @@ class GnociGymEnv(gym.Env):
             self._foot_airtime[i] += dt
             if not in_contact[other] or self.swing_time <= 0.0 or self.foot_clearance_height <= 0.0:
                 continue
-            time_frac = min(1.0, self._foot_airtime[i] / self.swing_time)
+            time_frac = self._foot_airtime[i] / self.swing_time
+            if time_frac > 1.0:
+                continue
             height_frac = min(1.0, max(0.0, foot_z[i]) / self.foot_clearance_height)
             reward += time_frac * height_frac
         return reward
