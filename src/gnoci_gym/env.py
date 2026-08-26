@@ -42,7 +42,7 @@ _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 # process_desc.py add_slack_joints) — same body, same axis, so its qpos/qvel
 # add directly onto the main joint's (see _get_joint_positions/_velocities).
 _JOINT_SLACK_NAMES = [f'{j}__slack' for j in _JOINT_NAMES]
-JOINT_SLACK_RANGE_RAD = math.radians(3.78)  # +/- per side; matches process_desc.py's placeholder
+JOINT_SLACK_RANGE_RAD = math.radians((3.78/2))  # +/- per side; matches process_desc.py's placeholder
 
 # Offset of the [pitch, roll] pair within the policy obs, matching the
 # concatenation order _get_policy_obs() builds: joint_pos, joint_vel,
