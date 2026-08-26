@@ -178,6 +178,13 @@ JOINT_ATTRS = {
     "armature": 0.012995945315907826
 }
 
+# Gear/joint mechanical backlash ("slack"), modeled as a second, unactuated
+# hinge joint sharing each main joint's axis (see add_slack_joints below).
+# Placeholder magnitude — retune once measured on the real robot.
+SLACK_RANGE_RAD = math.radians(0.5)   # +/- per side; ~1 deg total play
+SLACK_DAMPING = 1e-4                  # tiny — only to damp numerical rattle against the hard limit stops (frictionloss stays exactly 0)
+SLACK_SUFFIX = "__slack"
+
 def _indent(elem, level=0):
     """Add pretty-print indentation in-place (Python < 3.9 compat)."""
     pad = "\n" + "  " * level
@@ -331,6 +338,34 @@ def process(src, dst):
             joint.set(attr, str(value))
         joints_tuned += 1
 
+    # ── add unactuated backlash ("slack") joints, one per existing hinge ─────
+    # A second <joint> on the SAME body as the main joint, not a new body:
+    # MuJoCo composes multiple joints on one body as a serial chain, and since
+    # both share the same axis and the (default) origin pos, their rotations
+    # commute and sum exactly — qpos_main + qpos_slack is the true
+    # externally-observed angle (see env.py _get_joint_positions()). If any
+    # joint here ever gains an explicit `pos` upstream, this assumption breaks
+    # and the slack joint's `pos` must be copied too.
+    parent_map = {child: parent for parent in root.iter() for child in parent}
+    target_joints = [
+        j for j in root.iter("joint")
+        if j.get("type", "hinge") != "free" and j.get("name")
+    ]
+    slack_count = 0
+    for joint in target_joints:
+        name = joint.get("name")
+        parent = parent_map[joint]
+        slack = ET.Element("joint")
+        slack.set("name", f"{name}{SLACK_SUFFIX}")
+        slack.set("type", "hinge")
+        slack.set("axis", joint.get("axis", "0 0 1"))
+        slack.set("range", f"{-SLACK_RANGE_RAD:.10f} {SLACK_RANGE_RAD:.10f}")
+        slack.set("damping", str(SLACK_DAMPING))
+        slack.set("frictionloss", "0")
+        slack.set("armature", "0")
+        parent.insert(list(parent).index(joint) + 1, slack)
+        slack_count += 1
+
     # ── foot corner contact spheres ──────────────────────────────────────────
     # contype=2 conaffinity=1: collide with the floor (default mask,
     # contype=1) but not with each other or the robot.
@@ -362,6 +397,7 @@ def process(src, dst):
     print(f"  Geom masses assigned:   {masses_set}")
     print(f"  Foot contact spheres:   {len(sphere_names)} (all mesh contacts disabled)")
     print(f"  Touch sensors added:    {len(c_sense_sites)} ({', '.join(c_sense_sites)})")
+    print(f"  Slack joints added:     {slack_count}")
 
 
 def copy_assets(assets_src, assets_dst):
