@@ -38,6 +38,12 @@ _TOUCH_SENSOR_NAMES = [
 _N_JOINTS = len(_JOINT_NAMES)   # 10
 _N_TOUCH  = len(_TOUCH_SENSOR_NAMES)  # 4
 
+# Unactuated gear/joint backlash DOF added alongside each main joint (see
+# process_desc.py add_slack_joints) — same body, same axis, so its qpos/qvel
+# add directly onto the main joint's (see _get_joint_positions/_velocities).
+_JOINT_SLACK_NAMES = [f'{j}__slack' for j in _JOINT_NAMES]
+JOINT_SLACK_RANGE_RAD = math.radians(3.78)  # +/- per side; matches process_desc.py's placeholder
+
 # Offset of the [pitch, roll] pair within the policy obs, matching the
 # concatenation order _get_policy_obs() builds: joint_pos, joint_vel,
 # contacts, gyro(3), acc(3), then pitch/roll.
@@ -126,6 +132,7 @@ test_cfg = dict(
     joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
     joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
     joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
+    joint_slack_range=(JOINT_SLACK_RANGE_RAD, JOINT_SLACK_RANGE_RAD),
     # actuator_gain_range already scales kp (gainprm[0]/biasprm[1]) by a
     # percentage of its size each reset; kv_range does the same for kv
     # (biasprm[2]), independently — see _randomize_dynamics().
@@ -157,6 +164,7 @@ dom_rnd_cfg = dict(
     joint_friction_range=(0.7 * SYSID_JOINT_FRICTIONLOSS, 1.5 * SYSID_JOINT_FRICTIONLOSS),
     joint_armature_range=(0.8 * SYSID_JOINT_ARMATURE, 1.6 * SYSID_JOINT_ARMATURE),
     joint_damping_range=(0.7 * SYSID_JOINT_DAMPING, 1.5 * SYSID_JOINT_DAMPING),
+    joint_slack_range=(0.5 * JOINT_SLACK_RANGE_RAD, 1.5 * JOINT_SLACK_RANGE_RAD),
     actuator_gain_range=(0.9, 1.1),
     kv_range=(0.9, 1.1),
     gravity_noise=0.1,
@@ -211,6 +219,7 @@ class GnociGymEnv(gym.Env):
         'joint_friction_range':  _as_range,
         'joint_armature_range':  _as_range,
         'joint_damping_range':   _as_range,
+        'joint_slack_range':     _as_range,
         'actuator_gain_range':   _as_range,
         'kv_range':              _as_range,
         'gravity_noise':         _clamp_nonneg,
@@ -238,6 +247,7 @@ class GnociGymEnv(gym.Env):
             joint_friction_range=(SYSID_JOINT_FRICTIONLOSS, SYSID_JOINT_FRICTIONLOSS),
             joint_armature_range=(SYSID_JOINT_ARMATURE, SYSID_JOINT_ARMATURE),
             joint_damping_range=(SYSID_JOINT_DAMPING, SYSID_JOINT_DAMPING),
+            joint_slack_range=(JOINT_SLACK_RANGE_RAD, JOINT_SLACK_RANGE_RAD),
             actuator_gain_range=(1.0, 1.0),
             kv_range=(1.0, 1.0),
             gravity_noise=0.0,
@@ -308,6 +318,7 @@ class GnociGymEnv(gym.Env):
         self.joint_friction_range = joint_friction_range
         self.joint_armature_range = joint_armature_range
         self.joint_damping_range = joint_damping_range
+        self.joint_slack_range = joint_slack_range
         self.actuator_gain_range = actuator_gain_range
         self.kv_range = kv_range
         self.gravity_noise = gravity_noise
@@ -393,6 +404,25 @@ class GnociGymEnv(gym.Env):
         ]
         self.joint_dof_addrs = [
             self.model.jnt_dofadr[self.model.joint(j).id]
+            for j in _JOINT_NAMES
+        ]
+        # Backlash DOFs (see process_desc.py add_slack_joints) — same body,
+        # same axis as their main joint, so their qpos/qvel add directly onto
+        # it (see _get_joint_positions/_get_joint_velocities).
+        self.joint_slack_qpos_addrs = [
+            self.model.jnt_qposadr[self.model.joint(j).id]
+            for j in _JOINT_SLACK_NAMES
+        ]
+        self.joint_slack_dof_addrs = [
+            self.model.jnt_dofadr[self.model.joint(j).id]
+            for j in _JOINT_SLACK_NAMES
+        ]
+        self.joint_slack_ids = [
+            self.model.joint(j).id
+            for j in _JOINT_SLACK_NAMES
+        ]
+        self._main_joint_ids = [
+            self.model.joint(j).id
             for j in _JOINT_NAMES
         ]
         self.touch_sensor_addrs = [
@@ -521,6 +551,13 @@ class GnociGymEnv(gym.Env):
             self.model.dof_armature[dof_addr] = np.random.uniform(*self.joint_armature_range)
             self.model.dof_damping[dof_addr] = np.random.uniform(*self.joint_damping_range)
 
+        # Backlash magnitude, resampled per episode; slack dof_frictionloss/
+        # armature/damping are deliberately never touched here (they're not
+        # in joint_dof_addrs) — they stay pinned at their XML-baked ~0 values.
+        for slack_id in self.joint_slack_ids:
+            half_width = np.random.uniform(*self.joint_slack_range)
+            self.model.jnt_range[slack_id] = [-half_width, half_width]
+
         for i in range(self.model.nu):
             # kp (gainprm[0]/biasprm[1]) and kv (biasprm[2]) each get their
             # own independent per-episode scale — actuator_gain_range for kp,
@@ -567,12 +604,18 @@ class GnociGymEnv(gym.Env):
             f.value = 0.0
 
     def _randomize_joint_positions(self, randomness):
-        for joint_id in range(self.model.njnt):
-            if self.model.jnt_type[joint_id] == mujoco.mjtJoint.mjJNT_FREE:
-                continue
+        for joint_id in self._main_joint_ids:
             range_min, range_max = self.model.jnt_range[joint_id]
             adr = self.model.jnt_qposadr[joint_id]
             self.data.qpos[adr] += np.clip(np.random.normal(0, randomness), range_min, range_max)
+        # Slack joints get their own uniform initial placement within their
+        # (possibly just-resampled, see _randomize_dynamics) current range,
+        # rather than sharing the main joints' clipped-normal above — that
+        # clip saturates almost every draw against a range this tight, which
+        # would pin slack at one hard extreme on nearly every reset.
+        for slack_id, qpos_addr in zip(self.joint_slack_ids, self.joint_slack_qpos_addrs):
+            lo, hi = self.model.jnt_range[slack_id]
+            self.data.qpos[qpos_addr] = np.random.uniform(lo, hi)
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
@@ -660,10 +703,12 @@ class GnociGymEnv(gym.Env):
         return noisey_state, {'state': state}
 
     def _get_joint_positions(self):
-        return self.data.sensordata[self.joint_pos_sensor_addrs]
+        # Externally-observed angle = main joint (via its sensor) + slack
+        # joint (raw qpos, no sensor needed — same body/axis, so they sum).
+        return self.data.sensordata[self.joint_pos_sensor_addrs] + self.data.qpos[self.joint_slack_qpos_addrs]
 
     def _get_joint_velocities(self):
-        return self.data.qvel[self.joint_dof_addrs]
+        return self.data.qvel[self.joint_dof_addrs] + self.data.qvel[self.joint_slack_dof_addrs]
 
     def _update_contact_states(self):
         """Threshold (with hysteresis) and debounce the touch readings; called
