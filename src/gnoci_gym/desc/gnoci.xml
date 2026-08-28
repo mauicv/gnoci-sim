@@ -84,10 +84,10 @@
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material" contype="0" conaffinity="0" mass="0.037" />
                 <site group="3" name="forward_left_c_sense" pos="-0.026 -0.0551653 0.0310006" quat="0.5 0.5 -0.5 0.5" size="0.04" />
                 <site group="3" name="back_left_c_sense" pos="0.026 -0.0551653 0.0310006" quat="0.5 0.5 -0.5 0.5" size="0.04" />
-                <geom name="left_foot_front_inner_sphere" type="sphere" size="0.006" pos="-0.03810816 -0.04916554 0.01000100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="left_foot_back_inner_sphere" type="sphere" size="0.006" pos="0.03810813 -0.04916554 0.01000100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="left_foot_front_outer_sphere" type="sphere" size="0.006" pos="-0.03810816 -0.04916554 0.05200101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="left_foot_back_outer_sphere" type="sphere" size="0.006" pos="0.03810813 -0.04916554 0.05200101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="left_foot_front_inner_sphere" type="sphere" size="0.006" pos="-0.07810816 -0.05216554 0.00500100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="left_foot_back_inner_sphere" type="sphere" size="0.006" pos="0.07810813 -0.05216554 0.00500100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="left_foot_front_outer_sphere" type="sphere" size="0.006" pos="-0.07810816 -0.05216554 0.06300101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="left_foot_back_outer_sphere" type="sphere" size="0.006" pos="0.07810813 -0.05216554 0.06300101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
               </body>
             </body>
           </body>
@@ -145,10 +145,10 @@
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_1" material="right_foot_limit_switch_1_material" contype="0" conaffinity="0" />
                 <site group="3" name="forward_right_c_sense" pos="-0.026 0.0551653 0.0305994" quat="0.5 -0.5 0.5 0.5" size="0.04" />
                 <site group="3" name="back_right_c_sense" pos="0.026 0.0551653 0.0305994" quat="0.5 -0.5 0.5 0.5" size="0.04" />
-                <geom name="right_foot_front_outer_sphere" type="sphere" size="0.006" pos="-0.03810816 0.04916554 0.05159901" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="right_foot_back_outer_sphere" type="sphere" size="0.006" pos="0.03810813 0.04916554 0.05159901" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="right_foot_front_inner_sphere" type="sphere" size="0.006" pos="-0.03810816 0.04916554 0.00959900" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
-                <geom name="right_foot_back_inner_sphere" type="sphere" size="0.006" pos="0.03810813 0.04916554 0.00959900" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="right_foot_front_outer_sphere" type="sphere" size="0.006" pos="-0.07810816 0.05216554 0.00500100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="right_foot_back_outer_sphere" type="sphere" size="0.006" pos="0.07810813 0.05216554 0.00500100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="right_foot_front_inner_sphere" type="sphere" size="0.006" pos="-0.07810816 0.05216554 0.06300101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
+                <geom name="right_foot_back_inner_sphere" type="sphere" size="0.006" pos="0.07810813 0.05216554 0.06300101" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
               </body>
             </body>
           </body>

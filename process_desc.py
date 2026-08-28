@@ -88,18 +88,28 @@ FOOT_SPHERE_RADIUS = 0.006  # metres
 FOOT_SPHERE_SOLREF = "0.03 2"
 FOOT_SPHERE_SOLIMP = "0.9 0.95 0.006 0.5 2"
 
+# name="left_foot_front_inner_sphere" pos="-0.07810816 -0.05216554 0.00500100"
+# name="left_foot_back_inner_sphere" pos="0.07810813 -0.05216554 0.00500100"
+# name="left_foot_front_outer_sphere" pos="-0.07810816 -0.05216554 0.06300101"
+# name="left_foot_back_outer_sphere" pos="0.07810813 -0.05216554 0.06300101"
+
+# name="right_foot_front_outer_sphere" pos="-0.07810816 0.05216554 0.00500100"
+# name="right_foot_back_outer_sphere" pos="0.07810813 0.05216554 0.00500100"
+# name="right_foot_front_inner_sphere" pos="-0.07810816 0.05216554 0.06300101"
+# name="right_foot_back_inner_sphere" pos="0.07810813 0.05216554 0.06300101"
+
 FOOT_SPHERES: dict[str, dict[str, str]] = {
     "left_foot_base": {
-        "left_foot_front_inner_sphere": "-0.03810816 -0.04916554 0.01000100",
-        "left_foot_back_inner_sphere":  "0.03810813 -0.04916554 0.01000100",
-        "left_foot_front_outer_sphere": "-0.03810816 -0.04916554 0.05200101",
-        "left_foot_back_outer_sphere":  "0.03810813 -0.04916554 0.05200101",
+        "left_foot_front_inner_sphere": "-0.07810816 -0.05216554 0.00500100",
+        "left_foot_back_inner_sphere":  "0.07810813 -0.05216554 0.00500100",
+        "left_foot_front_outer_sphere": "-0.07810816 -0.05216554 0.06300101",
+        "left_foot_back_outer_sphere":  "0.07810813 -0.05216554 0.06300101",
     },
     "right_foot_base": {
-        "right_foot_front_outer_sphere": "-0.03810816 0.04916554 0.05159901",
-        "right_foot_back_outer_sphere":  "0.03810813 0.04916554 0.05159901",
-        "right_foot_front_inner_sphere": "-0.03810816 0.04916554 0.00959900",
-        "right_foot_back_inner_sphere":  "0.03810813 0.04916554 0.00959900",
+        "right_foot_front_outer_sphere": "-0.07810816 0.05216554 0.00500100",
+        "right_foot_back_outer_sphere": "0.07810813 0.05216554 0.00500100",
+        "right_foot_front_inner_sphere": "-0.07810816 0.05216554 0.06300101",
+        "right_foot_back_inner_sphere": "0.07810813 0.05216554 0.06300101",
     },
 }
 
