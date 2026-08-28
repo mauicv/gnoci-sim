@@ -4,7 +4,8 @@ Copy onshape-to-robot output to src desc and inject sensors.
 
 Adds:
   - jointpos sensor for every hinge joint
-  - 2 touch sites + 2 touch sensors per foot body (toe and heel)
+  - a touch sensor per foot c_sense site, with the site recentred onto the
+    contact-sphere group it senses (front / back) and resized
 
 Usage:
     python process_desc.py [--src desc/robot.xml] [--dst src/gnoci_gym/desc/gnoci.xml]
@@ -113,10 +114,41 @@ FOOT_SPHERES: dict[str, dict[str, str]] = {
     },
 }
 
-# Touch sensor site size (metres).  Sites sit ~0.035 m above the floor contact
-# surface; 0.04 m radius reaches the floor (0.035 m away) but not the opposite
-# site (~0.063 m away), giving clean front/back separation.
+# Touch sensor site size (metres).  Each c_sense site is recentred onto the
+# midpoint of its contact-sphere pair (see _c_sense_site_targets); the two
+# spheres in a pair are ~0.058 m apart, so a 0.04 m radius comfortably contains
+# them while staying well clear of the opposite pair (~0.156 m away), giving
+# clean front/back separation.
 C_SENSE_SITE_SIZE = 0.04
+
+# Which c_sense site senses which contact-sphere group.  Sites and spheres
+# share the foot body's local frame, so a site's pos can be set straight to the
+# centroid of its group.
+_C_SENSE_BODY_SIDE = {"left_foot_base": "left", "right_foot_base": "right"}
+_C_SENSE_GROUPS = (("front", "forward"), ("back", "back"))
+
+
+def _c_sense_site_targets() -> dict[str, str]:
+    """{site_name: "x y z"} placing each foot touch site at the centroid of the
+    contact spheres it should register (forward_* -> the 'front' spheres,
+    back_* -> the 'back' spheres of the same foot)."""
+    targets: dict[str, str] = {}
+    for body_name, spheres in FOOT_SPHERES.items():
+        side = _C_SENSE_BODY_SIDE.get(body_name)
+        if side is None:
+            continue
+        for tag, prefix in _C_SENSE_GROUPS:
+            pts = [
+                tuple(float(v) for v in pos.split())
+                for name, pos in spheres.items()
+                if tag in name
+            ]
+            if not pts:
+                continue
+            c = [sum(axis) / len(pts) for axis in zip(*pts)]
+            targets[f"{prefix}_{side}_c_sense"] = "{:.8f} {:.8f} {:.8f}".format(*c)
+    return targets
+
 
 # Meshes whose collision geoms should be stripped — sensors, servos, and
 # electronics that are rigidly mounted and only cause spurious contact forces.
@@ -246,10 +278,13 @@ def process(src, dst):
         s.set("joint", name)
         joints_instrumented.append(name)
 
+    c_sense_targets = _c_sense_site_targets()
     for site in root.iter("site"):
         name = site.get("name", "")
         if "c_sense" in name:
             site.set("size", str(C_SENSE_SITE_SIZE))
+            if name in c_sense_targets:
+                site.set("pos", c_sense_targets[name])
             c_sense_sites.append(name)
             t = ET.SubElement(sensor_el, "touch")
             t.set("name", f"{name}-touch")
