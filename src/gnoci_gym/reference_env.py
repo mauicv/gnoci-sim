@@ -2,7 +2,6 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-import torch
 
 from .config import CONTROL_HZ
 from .env import (
@@ -35,6 +34,10 @@ class ReferenceEnv:
         self.period = period
         self.frame_stack = frame_stack
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
+        # Sim time between consecutive rows of self._dataset. n_coarse below is
+        # chosen so this equals exactly one control step (1 / control_hz), i.e.
+        # one GnociGymEnv.step() worth of sim time.
+        self.dt = self.n_substeps * PHYSICS_DT
         self._initialize_model()
         self._dataset = self._build_dataset()
 
@@ -141,16 +144,20 @@ class ReferenceEnv:
     def sample_pairs(
         self,
         batch_size: int,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
+
+        Consecutive rows are spaced by ``self.dt`` (one control step), so the
+        returned pairs have the same time delta as consecutive
+        GnociGymEnv.step() observations.
 
         Returns:
             Tuple of (s_i, s_next), each of shape (batch_size, *obs_shape).
         """
         n_ref = len(self._dataset)
-        inds = torch.randint(0, n_ref, (batch_size,))
-        s_i = torch.from_numpy(self._dataset[inds])
-        s_next = torch.from_numpy(self._dataset[(inds + 1) % n_ref])
+        inds = np.random.randint(0, n_ref, size=batch_size)
+        s_i = self._dataset[inds]
+        s_next = self._dataset[(inds + 1) % n_ref]
         return s_i, s_next
 
     def get_reference(self) -> np.ndarray:
