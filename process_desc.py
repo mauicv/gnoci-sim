@@ -207,11 +207,11 @@ PART_MASSES: dict[str, float] = {
     "hip_front": 0.036,
     "upper_leg": 0.067,
     "lower_leg": 0.044,
-    "foot_base": 0.023,
-    "left_foot_right_side": 0.024,
-    "left_foot_left_side": 0.037,
-    "right_foot_left_side": 0.024,
-    "right_foot_right_side": 0.037,
+    "foot_base": 0.037,
+    "left_foot_right_side": 0.032,
+    "left_foot_left_side": 0.074,
+    "right_foot_left_side": 0.032,
+    "right_foot_right_side": 0.074,
 }
 
 JOINT_ATTRS = {
