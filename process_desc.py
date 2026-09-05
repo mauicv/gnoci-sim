@@ -182,8 +182,21 @@ JOINT_ATTRS = {
 # hinge joint sharing each main joint's axis (see add_slack_joints below).
 # Placeholder magnitude — retune once measured on the real robot.
 SLACK_RANGE_RAD = math.radians(0.5)   # +/- per side; ~1 deg total play
-SLACK_DAMPING = 1e-4                  # tiny — only to damp numerical rattle against the hard limit stops (frictionloss stays exactly 0)
 SLACK_SUFFIX = "__slack"
+
+# The slack joint's own damping/armature (frictionloss stays exactly 0, so
+# it's genuinely free to move within its range). A MuJoCo joint limit is a
+# compliant constraint, not a rigid stop — with nothing else to resist it, an
+# (almost) undamped, (almost) massless slack DOF rings against that soft
+# limit under load far beyond its configured range, instead of settling
+# there. Sized as a fraction of the main joint's own sysid'd damping/armature,
+# matching the proportions open_duck_mini_v2 uses for its backlash joints
+# (damping=0.01, armature=0.01 against its main joints' damping=0.56,
+# armature=0.027 — see Open_Duck_Playground/.../xmls/open_duck_mini_v2_backlash.xml).
+SLACK_DAMPING_RATIO  = 0.01 / 0.56    # ~1.8% of main joint damping
+SLACK_ARMATURE_RATIO = 0.01 / 0.027   # ~37% of main joint armature
+SLACK_DAMPING  = SLACK_DAMPING_RATIO  * JOINT_ATTRS["damping"]
+SLACK_ARMATURE = SLACK_ARMATURE_RATIO * JOINT_ATTRS["armature"]
 
 def _indent(elem, level=0):
     """Add pretty-print indentation in-place (Python < 3.9 compat)."""
@@ -362,7 +375,7 @@ def process(src, dst):
         slack.set("range", f"{-SLACK_RANGE_RAD:.10f} {SLACK_RANGE_RAD:.10f}")
         slack.set("damping", str(SLACK_DAMPING))
         slack.set("frictionloss", "0")
-        slack.set("armature", "0")
+        slack.set("armature", str(SLACK_ARMATURE))
         parent.insert(list(parent).index(joint) + 1, slack)
         slack_count += 1
 

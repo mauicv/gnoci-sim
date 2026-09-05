@@ -553,7 +553,10 @@ class GnociGymEnv(gym.Env):
 
         # Backlash magnitude, resampled per episode; slack dof_frictionloss/
         # armature/damping are deliberately never touched here (they're not
-        # in joint_dof_addrs) — they stay pinned at their XML-baked ~0 values.
+        # in joint_dof_addrs) — they stay pinned at their XML-baked values
+        # (process_desc.py's SLACK_DAMPING/SLACK_ARMATURE — small but
+        # non-negligible relative to the main joint, so the slack DOF settles
+        # against its soft limit stop instead of ringing against it).
         for slack_id in self.joint_slack_ids:
             half_width = np.random.uniform(*self.joint_slack_range)
             self.model.jnt_range[slack_id] = [-half_width, half_width]
