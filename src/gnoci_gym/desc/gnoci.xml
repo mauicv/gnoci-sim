@@ -77,16 +77,16 @@
                 <joint name="left_lower_leg__foot__slack" type="hinge" axis="-0.0 -0.0 -1.0" range="-0.0087266463 0.0087266463" damping="0.0001" frictionloss="0" armature="0" />
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material" />
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_1" material="left_foot_limit_switch_1_material" contype="0" conaffinity="0" />
-                <geom type="mesh" class="visual" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material" mass="0.023" />
-                <geom type="mesh" class="collision" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material" contype="0" conaffinity="0" mass="0.023" />
-                <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material" mass="0.024" />
-                <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material" contype="0" conaffinity="0" mass="0.024" />
+                <geom type="mesh" class="visual" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material" mass="0.037" />
+                <geom type="mesh" class="collision" pos="0.000268105 0.258024 -0.106099" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_base" material="left_foot_base_material" contype="0" conaffinity="0" mass="0.037" />
+                <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material" mass="0.032" />
+                <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_right_side" material="left_foot_right_side_material" contype="0" conaffinity="0" mass="0.032" />
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_2" material="left_foot_limit_switch_2_material" />
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_limit_switch_2" material="left_foot_limit_switch_2_material" contype="0" conaffinity="0" />
                 <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1066" quat="0.5 -0.5 -0.5 -0.5" mesh="left_lower_leg_servo_horn" material="left_lower_leg_servo_horn_material" mass="0.063" />
                 <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1066" quat="0.5 -0.5 -0.5 -0.5" mesh="left_lower_leg_servo_horn" material="left_lower_leg_servo_horn_material" contype="0" conaffinity="0" mass="0.063" />
-                <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material" mass="0.037" />
-                <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material" contype="0" conaffinity="0" mass="0.037" />
+                <geom type="mesh" class="visual" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material" mass="0.074" />
+                <geom type="mesh" class="collision" pos="0.000268125 0.255 -0.1063" quat="0.5 -0.5 -0.5 -0.5" mesh="left_foot_left_side" material="left_foot_left_side_material" contype="0" conaffinity="0" mass="0.074" />
                 <site group="3" name="forward_left_c_sense" pos="-0.07810816 -0.05216554 0.03400101" quat="0.5 0.5 -0.5 0.5" size="0.04" />
                 <site group="3" name="back_left_c_sense" pos="0.07810813 -0.05216554 0.03400101" quat="0.5 0.5 -0.5 0.5" size="0.04" />
                 <geom name="left_foot_front_inner_sphere" type="sphere" size="0.006" pos="-0.07810816 -0.05216554 0.00500100" solref="0.03 2" solimp="0.9 0.95 0.006 0.5 2" priority="1" group="3" contype="2" conaffinity="1" mass="0" />
@@ -143,14 +143,14 @@
                 <joint name="right_lower_leg__foot__slack" type="hinge" axis="0 0 1" range="-0.0087266463 0.0087266463" damping="0.0001" frictionloss="0" armature="0" />
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1066" quat="0.5 0.5 0.5 -0.5" mesh="right_lower_leg_servo_horn" material="right_lower_leg_servo_horn_material" mass="0.063" />
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1066" quat="0.5 0.5 0.5 -0.5" mesh="right_lower_leg_servo_horn" material="right_lower_leg_servo_horn_material" contype="0" conaffinity="0" mass="0.063" />
-                <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_right_side" material="right_foot_right_side_material" mass="0.037" />
-                <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_right_side" material="right_foot_right_side_material" contype="0" conaffinity="0" mass="0.037" />
-                <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_left_side" material="right_foot_left_side_material" mass="0.024" />
-                <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_left_side" material="right_foot_left_side_material" contype="0" conaffinity="0" mass="0.024" />
+                <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_right_side" material="right_foot_right_side_material" mass="0.074" />
+                <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_right_side" material="right_foot_right_side_material" contype="0" conaffinity="0" mass="0.074" />
+                <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_left_side" material="right_foot_left_side_material" mass="0.032" />
+                <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_left_side" material="right_foot_left_side_material" contype="0" conaffinity="0" mass="0.032" />
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_2" material="right_foot_limit_switch_2_material" />
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_2" material="right_foot_limit_switch_2_material" contype="0" conaffinity="0" />
-                <geom type="mesh" class="visual" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material" mass="0.023" />
-                <geom type="mesh" class="collision" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material" contype="0" conaffinity="0" mass="0.023" />
+                <geom type="mesh" class="visual" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material" mass="0.037" />
+                <geom type="mesh" class="collision" pos="0.000268113 -0.258024 -0.106501" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_base" material="right_foot_base_material" contype="0" conaffinity="0" mass="0.037" />
                 <geom type="mesh" class="visual" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_1" material="right_foot_limit_switch_1_material" />
                 <geom type="mesh" class="collision" pos="0.000268125 -0.255 -0.1063" quat="0.5 0.5 0.5 -0.5" mesh="right_foot_limit_switch_1" material="right_foot_limit_switch_1_material" contype="0" conaffinity="0" />
                 <site group="3" name="forward_right_c_sense" pos="-0.07810816 0.05216554 0.03400101" quat="0.5 -0.5 0.5 0.5" size="0.04" />
