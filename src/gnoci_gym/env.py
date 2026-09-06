@@ -921,9 +921,10 @@ class GnociGymEnv(gym.Env):
 
     def _get_stand_gate(self):
         """Posture quality in [0, 1]: 1 when upright at standing height, decaying
-        as the robot tips or sinks. Used as a multiplicative gate on the shaped
-        locomotion reward (and, inverted, as the fall penalty) rather than as a
-        standalone reward term, so it provides no standing reward floor."""
+        as the robot tips or sinks. Used as a standalone standing reward term
+        (weighted by c['stand']) in both tasks, inverted as the fall penalty,
+        and additionally as a multiplicative gate on the contact/pose shaping
+        in the standing task."""
         upright = self._get_root_upright()
         height  = self._get_root_height()
         standing = tolerance(
@@ -1165,7 +1166,7 @@ class GnociGymEnv(gym.Env):
     def _get_reward(self):
         c = self.reward_coefs
         stand_gate = self._get_stand_gate()
-        components = {'stand_gate': stand_gate}
+        components = {}
 
         if self.task == 'walk':
             velocity_reward      = self._get_velocity_reward()
@@ -1195,6 +1196,12 @@ class GnociGymEnv(gym.Env):
                 + c['yoke_joint']    * yoke_joint_reward
                 + c['yoke_symmetry'] * yoke_symmetry_reward
             )
+            # Standalone standing reward (same posture signal as the standing
+            # task, weighted by c['stand']) — an additive term, not a gate on
+            # the locomotion/posture shaping, so a walking robot is credited
+            # for staying upright without its forward-velocity credit being
+            # throttled by posture quality.
+            stand_term = c['stand'] * stand_gate
             fall_term = -c['fall'] * (1.0 - stand_gate)
             # Ungated: penalise large/jerky/out-of-bounds commands regardless
             # of posture, so the signal survives even while falling.
@@ -1203,11 +1210,13 @@ class GnociGymEnv(gym.Env):
             action_rate_term = -c['action_rate'] * action_rate_reward
             rotation_term = -c['rotation'] * rotation_penalty_reward
             strafe_term = -c['strafe'] * strafe_penalty_reward
-            # The shaped reward is gated by posture quality (so falling throttles
-            # it toward 0). The only thing payable while still is the decaying
-            # survival_bonus; falling is penalised rather than rewarded.
+            # Every term is additive: the locomotion and posture shaping stand
+            # on their own (locomotion is ~0 while still, posture is gated by
+            # forward motion), the standing reward is credited separately, and
+            # falling is penalised via fall_term rather than by throttling the
+            # rest toward 0.
             reward = (
-                stand_gate + (locomotion + posture)
+                stand_term + locomotion + posture
                 + self.survival_bonus
                 + fall_term
                 + action_magnitude_term
@@ -1217,16 +1226,17 @@ class GnociGymEnv(gym.Env):
                 + strafe_term
             )
 
-            # Each value here is the final, weighted/gated contribution to
-            # `reward` (not the raw [0, 1] signal) — they sum exactly to the
-            # total, so they can be plotted as a stacked breakdown.
+            # Each value here is the final, weighted contribution to `reward`
+            # (not the raw [0, 1] signal) — they sum exactly to the total, so
+            # they can be plotted as a stacked breakdown.
             components.update({
-                'velocity':       stand_gate * c['velocity']       * velocity_reward,
-                'foot_swing':     stand_gate * c['foot_swing']     * foot_swing_reward,
-                'raibert':        stand_gate * c['raibert']        * raibert_reward,
-                'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
-                'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint']    * yoke_joint_reward,
-                'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,
+                'stand':          stand_term,
+                'velocity':       c['velocity']       * velocity_reward,
+                'foot_swing':     c['foot_swing']     * foot_swing_reward,
+                'raibert':        c['raibert']        * raibert_reward,
+                'orientation':    velocity_reward * c['orientation'] * orientation_reward,
+                'yoke_joint':     velocity_reward * c['yoke_joint']    * yoke_joint_reward,
+                'yoke_symmetry':  velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,
                 'survival_bonus': self.survival_bonus,
                 'fall':           fall_term,
                 'action_magnitude': action_magnitude_term,
@@ -1262,6 +1272,7 @@ class GnociGymEnv(gym.Env):
             + action_rate_term
         )
         components.update({
+            'stand_gate':     stand_gate,
             'stand':          c['stand'] * stand_gate,
             'both_feet':      stand_gate * c['both_feet']    * both_feet_reward,
             'default_pose':   stand_gate * c['default_pose'] * default_pose_reward,
