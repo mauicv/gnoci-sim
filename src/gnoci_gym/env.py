@@ -1207,7 +1207,7 @@ class GnociGymEnv(gym.Env):
             # it toward 0). The only thing payable while still is the decaying
             # survival_bonus; falling is penalised rather than rewarded.
             reward = (
-                stand_gate * (locomotion + posture)
+                stand_gate + (locomotion + posture)
                 + self.survival_bonus
                 + fall_term
                 + action_magnitude_term
