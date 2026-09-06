@@ -19,12 +19,11 @@ import sys
 # env = GnociGymEnv(**kwargs)
 
 env = GnociGymEnv(
-    # initial_randomness=0.0,
-    # inertial_mass_range=(0.00, 0.00),
-    # inertial_mass_noise=0.00,
-    # floor_tilt_range=0.0,
+    initial_randomness=0.0,
+    inertial_mass_range=(0.00, 0.00),
+    floor_tilt_range=0.0,
     action_filter_alpha=1,
-    control_hz=40,
+    control_hz=50,
 )
 
 state, *_ = env.reset(seed=0)
@@ -44,22 +43,25 @@ standing_height = []
 root_heights = []
 root_uprights = []
 
+actuator_force = []
+
 for i in tqdm(range(100)):
 
     # action = np.random.uniform(-1, 1, env.action_space.shape[0])
-    action = np.random.randn(env.action_space.shape[0], 1) * 1
-    # action = np.zeros(env.action_space.shape[0])
+    # action = np.random.randn(env.action_space.shape[0], 1) * 1
+    action = np.zeros(env.action_space.shape[0])
     # action[2] = 1
     # action[5+2] = 1
     # action[4] = 1
     # action[9] = 1
     # action[3] = 1
-    # action[8] = 1
+    action[8] = 5
 
     # action = np.zeros(env.action_space.shape[0])
-    # action = np.ones(env.action_space.shape[0])
     # action = env.unwrapped.data.ctrl.copy()
     state, reward, done, truncated, _ = env.step(action)
+
+    actuator_force.append(env.data.actuator_force.copy())
 
     root_height = env.unwrapped._get_root_height()
     root_upright = env.unwrapped._get_root_upright()
@@ -76,12 +78,13 @@ for i in tqdm(range(100)):
     rewards.append(reward)
     frames.append(env.render())
 
-plt.plot(times, rewards)
-plt.plot(times, touching_floor)
-# plt.plot(times, root_uprights)
 # plt.plot(times, rewards)
-plt.plot(times, dones)
-# plt.plot(times, contacts)
+# plt.plot(times, touching_floor)
+# # plt.plot(times, root_uprights)
+# # plt.plot(times, rewards)
+# plt.plot(times, dones)
+# # plt.plot(times, contacts)
+plt.plot(actuator_force)
 plt.show()
 
 imageio.mimsave(f'assets/animation.gif', frames, loop=0, fps=30)

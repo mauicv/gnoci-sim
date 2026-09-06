@@ -72,6 +72,7 @@ frames = []
 renderer = mujoco.Renderer(env.model, height=RENDER_H, width=RENDER_W)
 frames.append(renderer.render())  # matches the pre-first-action state above
 
+
 for action in tqdm(actions, desc="Replaying rollout"):
     action = ((math.pi*0.75)/0.2) * action
     state, *_ = env.step(action)
