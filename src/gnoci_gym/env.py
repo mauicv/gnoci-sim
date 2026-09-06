@@ -55,6 +55,19 @@ _CONTACT_FORCE_OFF = 0.5
 # means the reward drops off faster as forward speed misses target_velocity.
 TRACKING_SIGMA = 0.01
 
+# --- Raibert foot-placement heuristic (_get_raibert_reward) -----------------
+# Feedback gain k in the Raibert fore-aft step-placement target
+#   fwd_offset* = 0.5 * T_stance * v_forward + k * (v_forward - target_velocity)
+# The 0.5 * T_stance * v term is the "neutral" foot placement (half the
+# distance the body covers in one stance phase); k * velocity_error steps
+# the foot further ahead when the body is under-speed (push harder) and
+# shorter when it's over-speed (brake). Small robot at low speed — a light
+# gain keeps the correction from swamping the neutral term. Tunable.
+_RAIBERT_FEEDBACK_GAIN = 0.1
+# exp() falloff on the squared fore-aft foot-placement error (m²): a ~5 cm
+# miss costs one e-fold at 0.0025. Tunable.
+_RAIBERT_TRACKING_SIGMA = 0.0025
+
 IMU_GYRO_SCALE = ((180 / np.pi) / 250.0)
 IMU_ACC_SCALE  = 9.81 # m/s² (2g) — clips to [-1, 1]
 
@@ -191,6 +204,7 @@ class GnociGymEnv(gym.Env):
         'default_pose':  0.5,
         'velocity':      2.5,
         'foot_swing':    1.0,
+        'raibert':       1.0,
         'fall':          0.5,
         'orientation':   0.1,
         'rotation':      0.5,
@@ -451,6 +465,14 @@ class GnociGymEnv(gym.Env):
         )
         self.right_foot_body_id = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_BODY, "right_foot_base"
+        )
+        # Leg roots (attachment to the torso) — the "hip" reference point the
+        # Raibert foot-placement target is measured from (see _get_raibert_reward).
+        self.left_hip_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "left_yoke_lower_frame"
+        )
+        self.right_hip_body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "right_yoke_lower_frame"
         )
         try:
             self.floor_geom_id = self.model.geom("floor").id
@@ -1040,6 +1062,68 @@ class GnociGymEnv(gym.Env):
             reward += time_frac * height_frac
         return reward
 
+    def _get_raibert_reward(self):
+        """Raibert foot-placement heuristic — rewards the swing foot for
+        heading toward where a Raibert-style step planner would put it.
+
+        Raibert's rule is a sagittal-plane (fore-aft) speed-regulation law:
+        for a periodic gait the neutral touchdown point of a foot, measured
+        forward from its hip, is half the distance the body travels in one
+        stance phase, 0.5 * T_stance * v_forward, plus a velocity-error
+        feedback term k * (v_forward - v_desired) that steps the foot further
+        ahead when the body is under-speed (to push harder) and shorter when
+        it's over-speed (to brake):
+
+            fwd_offset* = 0.5 * T_stance * v_forward + k * (v_forward - target_velocity)
+
+        Credit is exp(-error² / sigma) on the fore-aft distance between the
+        swing foot's actual hip-relative forward offset and this target, with
+        v_forward and the offset both taken along the body-forward axis. Only
+        the airborne foot during single support is scored (the planted foot's
+        placement is already committed); 0 during double support or a
+        two-foot flight. T_stance is approximated by self.swing_time — the
+        single-support swing of one foot roughly equals the stance of the
+        other for a symmetric gait — so it follows the same curriculum knob
+        as _get_foot_swing_reward. Lateral placement is left to the strafe
+        penalty and leg kinematics; only the fore-aft axis is scored here.
+
+        This is soft shaping: rewarding the swing foot to sit at its
+        touchdown target for the whole swing (not just at the end) is a
+        deliberate simplification, kept mild by its coefficient.
+        """
+        if self.swing_time <= 0.0:
+            return 0.0
+        forward_xy = self._get_body_forward_xy()
+        if not np.any(forward_xy):
+            return 0.0
+
+        contacts = self._contact_states
+        in_contact = [
+            contacts[0] > 0 or contacts[1] > 0,  # left foot
+            contacts[2] > 0 or contacts[3] > 0,  # right foot
+        ]
+
+        v_fwd = float(np.dot(self._get_velocity()[:2], forward_xy))
+        target_fwd = (
+            0.5 * self.swing_time * v_fwd
+            + _RAIBERT_FEEDBACK_GAIN * (v_fwd - self.target_velocity)
+        )
+
+        feet = (
+            (self.left_foot_body_id, self.left_hip_body_id),
+            (self.right_foot_body_id, self.right_hip_body_id),
+        )
+        reward = 0.0
+        for i, other in ((0, 1), (1, 0)):
+            if in_contact[i] or not in_contact[other]:
+                continue  # score only the swing foot in single support
+            foot_id, hip_id = feet[i]
+            d_xy = self.data.xpos[foot_id][:2] - self.data.xpos[hip_id][:2]
+            off_fwd = float(np.dot(d_xy, forward_xy))
+            err = (off_fwd - target_fwd) ** 2
+            reward += math.exp(-err / _RAIBERT_TRACKING_SIGMA)
+        return reward
+
     def _get_both_feet_contact_reward(self):
         contacts = self._contact_states
         left  = contacts[0] > 0 or contacts[1] > 0
@@ -1086,6 +1170,7 @@ class GnociGymEnv(gym.Env):
         if self.task == 'walk':
             velocity_reward      = self._get_velocity_reward()
             foot_swing_reward    = self._get_foot_swing_reward()
+            raibert_reward       = self._get_raibert_reward()
             orientation_reward   = self._get_orientation_reward()
             yoke_joint_reward    = self._get_yoke_joint_reward()
             yoke_symmetry_reward = self._get_yoke_symmetry_reward()
@@ -1101,6 +1186,7 @@ class GnociGymEnv(gym.Env):
             locomotion = (
                 c['velocity']    * velocity_reward
                 + c['foot_swing'] * foot_swing_reward
+                + c['raibert']    * raibert_reward
             )
             # Posture shaping, gated by forward motion so a motionless-but-tidy
             # robot earns ~0 from it (no alternate standing floor).
@@ -1137,6 +1223,7 @@ class GnociGymEnv(gym.Env):
             components.update({
                 'velocity':       stand_gate * c['velocity']       * velocity_reward,
                 'foot_swing':     stand_gate * c['foot_swing']     * foot_swing_reward,
+                'raibert':        stand_gate * c['raibert']        * raibert_reward,
                 'orientation':    stand_gate * velocity_reward * c['orientation'] * orientation_reward,
                 'yoke_joint':     stand_gate * velocity_reward * c['yoke_joint']    * yoke_joint_reward,
                 'yoke_symmetry':  stand_gate * velocity_reward * c['yoke_symmetry'] * yoke_symmetry_reward,

@@ -31,6 +31,7 @@ def make_env(seed=1, max_steps=NUM_STEPS, test: bool=False):
             'rotation':         0.05,
             'strafe':           0.05,
             'foot_swing':       1.0,
+            'raibert':          1.0,
             'orientation':      1.0,
             'yoke_joint':       2.0,
             'action_magnitude': 0.0,
