@@ -118,6 +118,8 @@ def _build_obs_noise_vec(scales):
 
 test_cfg = dict(
     initial_randomness=0.0,
+    joint_zero_offset_range=0.0,
+    joint_cmd_gain_range=(1.0, 1.0),
     inertial_mass_range=(0.0, 0.0),
     torso_com_offset_range=0.0,
     torso_mass_range=(1.0, 1.0),
@@ -141,6 +143,17 @@ test_cfg = dict(
 
 dom_rnd_cfg = dict(
     initial_randomness=0.05,
+    # per-joint servo zero-point (encoder calibration) error — a fixed
+    # per-episode offset between the joint angle the policy commands/observes
+    # and the physical qpos the servo actually holds. ~0.05 rad (~2.9deg) is
+    # in line with hobby-servo horn-spline / assembly miscalibration.
+    joint_zero_offset_range=0.05,
+    # per-joint multiplicative command-gain (servo travel) tolerance — the
+    # transmission-side sibling of joint_zero_offset_range: horn-spline seating,
+    # gear backlash and PWM->angle calibration make actual travel a few percent
+    # off the commanded target. Left observable (not compensated in
+    # _get_joint_positions), so the policy corrects it via feedback.
+    joint_cmd_gain_range=(0.9, 1.1),
     # widened from the old (0.02, 0.04) range to fold in what the removed
     # inertial_mass_noise (std 0.01) used to contribute
     inertial_mass_range=(0.01, 0.05),
@@ -203,6 +216,8 @@ class GnociGymEnv(gym.Env):
         'swing_time':            _clamp_nonneg,
         'max_actuator_velocity': _clamp_nonneg,
         'initial_randomness':    _clamp_nonneg,
+        'joint_zero_offset_range': _clamp_nonneg,
+        'joint_cmd_gain_range':   _as_range,
         'inertial_mass_range':   _as_range,
         'torso_com_offset_range': _clamp_nonneg,
         'torso_mass_range':      _as_range,
@@ -228,6 +243,8 @@ class GnociGymEnv(gym.Env):
             render_mode='rgb_array',
             control_hz=CONTROL_HZ,
             initial_randomness=0.1,
+            joint_zero_offset_range=0.0,
+            joint_cmd_gain_range=(1.0, 1.0),
             # widened from the old (0.04, 0.06) range to fold in what the
             # removed inertial_mass_noise (std 0.03) used to contribute
             inertial_mass_range=(0.0, 0.1),
@@ -300,6 +317,27 @@ class GnociGymEnv(gym.Env):
         self.control_hz = control_hz
         self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
         self.initial_randomness = initial_randomness
+        # Symmetric bound (radians) on a fixed per-joint, per-episode servo
+        # zero-point offset — the sim analogue of a joint's MJCF ``ref`` /
+        # ``model.qpos0`` being miscalibrated on the real robot. MuJoCo's
+        # position actuators and jointpos sensors both ignore qpos0, so this
+        # is applied by hand: step() drives the joint to
+        # ``gain * policy_target + offset`` while _get_joint_positions()
+        # subtracts the offset back off, so the policy's control loop stays
+        # self-consistent (an encoder-zero error is unobservable) but the
+        # physical pose — and hence contact geometry / balance — is shifted.
+        # Resampled each reset() (see self._joint_zero_offset).
+        self.joint_zero_offset_range = float(joint_zero_offset_range)
+        self._joint_zero_offset = np.zeros(_N_JOINTS, dtype=np.float32)
+        # Per-joint multiplicative gain on the commanded target — servo travel
+        # tolerance (transmission side), the sibling of the additive zero-point
+        # offset above: physical qpos settles to ``gain * policy_target +
+        # offset``. Unlike the offset this is left uncompensated in
+        # _get_joint_positions(), so the policy sees the joint under/overshoot
+        # and closes the loop against it. Resampled each reset() (see
+        # self._joint_cmd_gain).
+        self.joint_cmd_gain_range = _as_range(joint_cmd_gain_range)
+        self._joint_cmd_gain = np.ones(_N_JOINTS, dtype=np.float32)
         self.inertial_mass_range = inertial_mass_range
         self.torso_com_offset_range = torso_com_offset_range
         self.torso_mass_range = torso_mass_range
@@ -361,6 +399,7 @@ class GnociGymEnv(gym.Env):
         )
         self._build_model()
         self._randomize_dynamics()
+        self._randomize_servo_calibration()
         self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
@@ -373,8 +412,13 @@ class GnociGymEnv(gym.Env):
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         # Rate-limiter state (see step()): starts at the actuators' initial
-        # commanded position so the first step isn't slew-limited relative to 0.
-        self._prev_target = self.data.ctrl.copy().astype(np.float32)
+        # commanded position so the first step isn't slew-limited relative to
+        # 0. Held in the policy's target space — invert step()'s
+        # ``gain * target + offset`` mapping on the seeded ctrl — matching
+        # what step() compares against.
+        self._prev_target = (
+            (self.data.ctrl - self._joint_zero_offset) / self._joint_cmd_gain
+        ).astype(np.float32)
 
     def _build_model(self):
         """One-time model compile + cache. Not called on reset() — only the
@@ -555,10 +599,36 @@ class GnociGymEnv(gym.Env):
         # cheaper than a full XML recompile.
         mujoco.mj_setConst(self.model, self.data)
 
+    def _randomize_servo_calibration(self):
+        """Resample the per-joint servo calibration for the episode: the
+        additive zero-point offset (joint_zero_offset_range) and the
+        multiplicative command gain (joint_cmd_gain_range). Both are one fixed
+        draw per episode and combine in step() as
+        ``ctrl = gain * policy_target + offset``; only the offset is undone in
+        _get_joint_positions()."""
+        r = self.joint_zero_offset_range
+        if r > 0:
+            self._joint_zero_offset = np.random.uniform(
+                -r, r, _N_JOINTS
+            ).astype(np.float32)
+        else:
+            self._joint_zero_offset = np.zeros(_N_JOINTS, dtype=np.float32)
+
+        lo, hi = self.joint_cmd_gain_range
+        if (lo, hi) != (1.0, 1.0):
+            self._joint_cmd_gain = np.random.uniform(
+                lo, hi, _N_JOINTS
+            ).astype(np.float32)
+        else:
+            self._joint_cmd_gain = np.ones(_N_JOINTS, dtype=np.float32)
+
     def _set_joint_positions(self):
-        for jnt_name in _JOINT_NAMES:
-            qpos_addr = self.model.jnt_qposadr[self.model.joint(jnt_name).id]
-            self.data.qpos[qpos_addr] = 0.0
+        # Seed each actuated joint at its zero-point offset: this is the
+        # physical pose the servo settles to for a zero command, so the
+        # episode starts already consistent with the miscalibration rather
+        # than snapping to it over the first few steps.
+        for i, qpos_addr in enumerate(self.joint_qpos_addrs):
+            self.data.qpos[qpos_addr] = self._joint_zero_offset[i]
         for i, qpos_addr in enumerate(self.joint_qpos_addrs):
             self.data.ctrl[i] = self.data.qpos[qpos_addr]
 
@@ -616,6 +686,7 @@ class GnociGymEnv(gym.Env):
     def reset(self, seed=None, **kwargs):
         mujoco.mj_resetData(self.model, self.data)
         self._randomize_dynamics()
+        self._randomize_servo_calibration()
         self._set_joint_positions()
         self._randomize_joint_positions(randomness=self.initial_randomness)
         self._sync_action_filters()
@@ -639,7 +710,10 @@ class GnociGymEnv(gym.Env):
         self._foot_airtime = [0.0, 0.0]
         self._last_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
         self._prev_raw_action = np.zeros(_N_JOINTS, dtype=np.float32)
-        self._prev_target = self.data.ctrl.copy().astype(np.float32)
+        # policy target space, matching step() (see the __init__ seeding).
+        self._prev_target = (
+            (self.data.ctrl - self._joint_zero_offset) / self._joint_cmd_gain
+        ).astype(np.float32)
 
         if self.max_action_delay > 0:
             self._action_delay = np.random.randint(0, self.max_action_delay + 1)
@@ -660,7 +734,14 @@ class GnociGymEnv(gym.Env):
         return noisey_state, {'state': state}
 
     def _get_joint_positions(self):
-        return self.data.sensordata[self.joint_pos_sensor_addrs]
+        # Subtract only the per-episode servo zero-point offset (an encoder-zero
+        # error is unobservable): the policy and the joint-based reward terms
+        # then see ``t`` back when the joint has settled at its commanded
+        # target, and the offset shows up only in the physics (contact
+        # geometry, balance). The command-gain error (_joint_cmd_gain) is
+        # deliberately *not* undone here — it's a transmission-side error the
+        # policy is meant to observe as under/overshoot and correct.
+        return self.data.sensordata[self.joint_pos_sensor_addrs] - self._joint_zero_offset
 
     def _get_joint_velocities(self):
         return self.data.qvel[self.joint_dof_addrs]
@@ -1144,7 +1225,14 @@ class GnociGymEnv(gym.Env):
                 self._prev_target[i] + max_step,
             )
             self._prev_target[i] = new_target
-            self.data.ctrl[i] = float(np.clip(new_target, lo, hi))
+            # The policy commands, and _prev_target/slew-limiting track, a
+            # target in the policy's own space; the physical servo drives the
+            # joint to ``gain * target + offset`` — its per-episode command-gain
+            # and zero-point miscalibration (see _randomize_servo_calibration).
+            # Range-clip in physical space since it's a bound on the real joint.
+            self.data.ctrl[i] = float(np.clip(
+                self._joint_cmd_gain[i] * new_target + self._joint_zero_offset[i], lo, hi
+            ))
             target_actions.append(float(new_target))
         for _ in range(self.n_substeps):
             mujoco.mj_step(self.model, self.data)
