@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "gymnasium",
-    "mujoco",
+    "mujoco==3.10.0",
     "filterpy",
 ]
 dynamic = ["version"]

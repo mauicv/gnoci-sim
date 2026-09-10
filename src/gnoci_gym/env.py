@@ -248,6 +248,7 @@ class GnociGymEnv(gym.Env):
             push_interval_range=(2.0, 5.0),
             max_action_delay=0,
             max_obs_delay=0,
+            include_critic_obs=True,
             action_filter_alpha=0.4,
             action_scale=0.25,
             task='stand',
@@ -331,6 +332,12 @@ class GnociGymEnv(gym.Env):
         self.max_obs_delay = max_obs_delay
         self._obs_delay = 0
         self._obs_buffer = None
+        # When False, step()/reset() return only the noisy policy obs — the
+        # clean_policy_obs copy and the privileged critic_only_obs are dropped
+        # from the flat observation (and critic_observation_space_size is 0).
+        # Use for symmetric (actor-only) setups that never consume a critic
+        # slice; the info dict's 'state' likewise carries just clean_policy_obs.
+        self.include_critic_obs = bool(include_critic_obs)
         self.action_filter_alpha = action_filter_alpha
         self.action_scale = action_scale
         self.fix_root_body = fix_root_body
@@ -340,7 +347,10 @@ class GnociGymEnv(gym.Env):
         # critic sees a clean (noise-free) copy of the policy obs plus privileged
         # extras: gravity vector (3), base lin v (3), base angular v (3), base
         # height (1), foot lin v (2 feet x 3), foot air time (2). Total +18.
-        self.critic_observation_space_size = self.policy_observation_space_size + 18
+        # Zeroed out entirely when include_critic_obs is False.
+        self.critic_observation_space_size = (
+            self.policy_observation_space_size + 18 if self.include_critic_obs else 0
+        )
 
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf,
@@ -351,6 +361,8 @@ class GnociGymEnv(gym.Env):
         # so callers can do policy_obs = obs[env.policy_obs_idx] and
         # critic_obs = obs[env.critic_obs_idx] instead of hardcoding the
         # split point. See _get_obs for the concatenation order these mirror.
+        # With include_critic_obs=False the flat obs is just the policy slice,
+        # so critic_obs_idx is empty.
         self.policy_obs_idx = np.arange(self.policy_observation_space_size)
         self.critic_obs_idx = np.arange(
             self.policy_observation_space_size,
@@ -755,10 +767,14 @@ class GnociGymEnv(gym.Env):
             else:
                 self._obs_buffer.append(noise_policy_obs.copy())
             noise_policy_obs = self._obs_buffer[0]
-        critic_only_obs = self._get_critic_only_obs()
 
-        noisey_state = np.concatenate([noise_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
-        state = np.concatenate([clean_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
+        if self.include_critic_obs:
+            critic_only_obs = self._get_critic_only_obs()
+            noisey_state = np.concatenate([noise_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
+            state = np.concatenate([clean_policy_obs, clean_policy_obs, critic_only_obs], axis=0)
+        else:
+            noisey_state = noise_policy_obs
+            state = clean_policy_obs
         return noisey_state.astype(np.float32), state.astype(np.float32)
 
     def _get_info(self):
