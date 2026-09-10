@@ -2,7 +2,7 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-import torch
+# import torch
 
 from .config import CONTROL_HZ
 from .env import (
@@ -30,128 +30,128 @@ class ReferenceEnv:
     def __init__(self, task='walk', control_hz=CONTROL_HZ, period=1.0, frame_stack=1):
         if task not in _REFERENCE_XML:
             raise ValueError(f"No reference trajectory for task '{task}'. Supported: {list(_REFERENCE_XML)}")
-        self.task = task
-        self.control_hz = control_hz
-        self.period = period
-        self.frame_stack = frame_stack
-        self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
-        self._initialize_model()
-        self._dataset = self._build_dataset()
+    #     self.task = task
+    #     self.control_hz = control_hz
+    #     self.period = period
+    #     self.frame_stack = frame_stack
+    #     self.n_substeps = int(round(1.0 / (control_hz * PHYSICS_DT)))
+    #     self._initialize_model()
+    #     self._dataset = self._build_dataset()
 
-    def _initialize_model(self):
-        xml = _load_xml('scene')
-        self.model = mujoco.MjModel.from_xml_string(xml)
-        self.model.opt.timestep = PHYSICS_DT
-        self.data = mujoco.MjData(self.model)
+    # def _initialize_model(self):
+    #     xml = _load_xml('scene')
+    #     self.model = mujoco.MjModel.from_xml_string(xml)
+    #     self.model.opt.timestep = PHYSICS_DT
+    #     self.data = mujoco.MjData(self.model)
 
-        self.joint_pos_sensor_addrs = [
-            self.model.sensor_adr[self.model.sensor(f'{j}-pos').id]
-            for j in _JOINT_NAMES
-        ]
-        self.joint_dof_addrs = [
-            self.model.jnt_dofadr[self.model.joint(j).id]
-            for j in _JOINT_NAMES
-        ]
-        self.touch_sensor_addrs = [
-            self.model.sensor_adr[self.model.sensor(n).id]
-            for n in _TOUCH_SENSOR_NAMES
-        ]
-        self.imu_sensor_addrs = [
-            self.model.sensor_adr[self.model.sensor(n).id]
-            for n in ['imu-gyro', 'imu-acc']
-        ]
-        self.joint_qpos_addrs = [
-            self.model.jnt_qposadr[self.model.joint(j).id]
-            for j in _JOINT_NAMES
-        ]
-        self.comp_filter = ComplementaryFilter()
+    #     self.joint_pos_sensor_addrs = [
+    #         self.model.sensor_adr[self.model.sensor(f'{j}-pos').id]
+    #         for j in _JOINT_NAMES
+    #     ]
+    #     self.joint_dof_addrs = [
+    #         self.model.jnt_dofadr[self.model.joint(j).id]
+    #         for j in _JOINT_NAMES
+    #     ]
+    #     self.touch_sensor_addrs = [
+    #         self.model.sensor_adr[self.model.sensor(n).id]
+    #         for n in _TOUCH_SENSOR_NAMES
+    #     ]
+    #     self.imu_sensor_addrs = [
+    #         self.model.sensor_adr[self.model.sensor(n).id]
+    #         for n in ['imu-gyro', 'imu-acc']
+    #     ]
+    #     self.joint_qpos_addrs = [
+    #         self.model.jnt_qposadr[self.model.joint(j).id]
+    #         for j in _JOINT_NAMES
+    #     ]
+    #     self.comp_filter = ComplementaryFilter()
 
-    def _build_dataset(self) -> np.ndarray:
-        # Dataset rows must be spaced by exactly one env.step() worth of sim
-        # time (n_substeps physics steps), not one physics step, so that
-        # sample_pairs() returns (s_t, s_{t+dt}) pairs at the same dt as
-        # consecutive GnociGymEnv.step() observations. We still interpolate
-        # the trajectory at physics-step resolution (n_fine) so the ±n_substeps
-        # finite-difference velocity window below has fine-grained samples to
-        # work with, but only every n_substeps-th fine sample is written out
-        # to `dataset`. n_fine is an exact multiple of n_substeps so those
-        # window lookups always land on other coarse-frame-aligned samples.
-        n_coarse = max(1, int(round(self.period * self.control_hz)))
-        n_fine = n_coarse * self.n_substeps
+    # def _build_dataset(self) -> np.ndarray:
+    #     # Dataset rows must be spaced by exactly one env.step() worth of sim
+    #     # time (n_substeps physics steps), not one physics step, so that
+    #     # sample_pairs() returns (s_t, s_{t+dt}) pairs at the same dt as
+    #     # consecutive GnociGymEnv.step() observations. We still interpolate
+    #     # the trajectory at physics-step resolution (n_fine) so the ±n_substeps
+    #     # finite-difference velocity window below has fine-grained samples to
+    #     # work with, but only every n_substeps-th fine sample is written out
+    #     # to `dataset`. n_fine is an exact multiple of n_substeps so those
+    #     # window lookups always land on other coarse-frame-aligned samples.
+    #     n_coarse = max(1, int(round(self.period * self.control_hz)))
+    #     n_fine = n_coarse * self.n_substeps
 
-        keys = _load_keyframes(_REFERENCE_XML[self.task])
-        traj = interpolate(keys, n_frames=n_fine)  # (n_fine, 17)
+    #     keys = _load_keyframes(_REFERENCE_XML[self.task])
+    #     traj = interpolate(keys, n_frames=n_fine)  # (n_fine, 17)
 
-        saved_qpos = self.data.qpos.copy()
-        saved_qvel = self.data.qvel.copy()
-        self.comp_filter.reset()
+    #     saved_qpos = self.data.qpos.copy()
+    #     saved_qvel = self.data.qvel.copy()
+    #     self.comp_filter.reset()
 
-        dataset = np.zeros((n_coarse, _OBS_DIM), dtype=np.float32)
-        vel_window = 2.0 / self.control_hz  # time span of centered difference
+    #     dataset = np.zeros((n_coarse, _OBS_DIM), dtype=np.float32)
+    #     vel_window = 2.0 / self.control_hz  # time span of centered difference
 
-        for k in range(n_coarse):
-            i = k * self.n_substeps
-            self.data.qpos[:traj.shape[1]] = traj[i]
+    #     for k in range(n_coarse):
+    #         i = k * self.n_substeps
+    #         self.data.qpos[:traj.shape[1]] = traj[i]
 
-            i_fwd = (i + self.n_substeps) % n_fine
-            i_bwd = (i - self.n_substeps) % n_fine
-            vel = (traj[i_fwd, 7:] - traj[i_bwd, 7:]) / vel_window
-            for j, dof_addr in enumerate(self.joint_dof_addrs):
-                self.data.qvel[dof_addr] = vel[j]
+    #         i_fwd = (i + self.n_substeps) % n_fine
+    #         i_bwd = (i - self.n_substeps) % n_fine
+    #         vel = (traj[i_fwd, 7:] - traj[i_bwd, 7:]) / vel_window
+    #         for j, dof_addr in enumerate(self.joint_dof_addrs):
+    #             self.data.qvel[dof_addr] = vel[j]
 
-            mujoco.mj_forward(self.model, self.data)
+    #         mujoco.mj_forward(self.model, self.data)
 
-            gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
-            acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
-            # One filter update per dataset row (i.e. per control step), matching
-            # how GnociGymEnv._get_pitch_and_roll updates the filter once per
-            # env.step() rather than once per physics substep.
-            self.comp_filter.update(acc, gyro, dt=1.0 / self.control_hz)
+    #         gyro = self.data.sensordata[self.imu_sensor_addrs[0]:self.imu_sensor_addrs[0] + 3]
+    #         acc  = self.data.sensordata[self.imu_sensor_addrs[1]:self.imu_sensor_addrs[1] + 3]
+    #         # One filter update per dataset row (i.e. per control step), matching
+    #         # how GnociGymEnv._get_pitch_and_roll updates the filter once per
+    #         # env.step() rather than once per physics substep.
+    #         self.comp_filter.update(acc, gyro, dt=1.0 / self.control_hz)
 
-            joint_pos = self.data.sensordata[self.joint_pos_sensor_addrs] / np.pi
-            joint_vel = self.data.qvel[self.joint_dof_addrs]
+    #         joint_pos = self.data.sensordata[self.joint_pos_sensor_addrs] / np.pi
+    #         joint_vel = self.data.qvel[self.joint_dof_addrs]
 
-            dataset[k] = np.array([
-                *joint_pos,
-                *joint_vel,
-                *(self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32),
-                *(gyro / IMU_GYRO_SCALE),
-                *(acc / IMU_ACC_SCALE),
-                self.comp_filter.pitch,
-                self.comp_filter.roll,
-            ], dtype=np.float32)
+    #         dataset[k] = np.array([
+    #             *joint_pos,
+    #             *joint_vel,
+    #             *(self.data.sensordata[self.touch_sensor_addrs] > 0).astype(np.float32),
+    #             *(gyro / IMU_GYRO_SCALE),
+    #             *(acc / IMU_ACC_SCALE),
+    #             self.comp_filter.pitch,
+    #             self.comp_filter.roll,
+    #         ], dtype=np.float32)
 
-        self.data.qpos[:] = saved_qpos
-        self.data.qvel[:] = saved_qvel
-        mujoco.mj_forward(self.model, self.data)
-        self.comp_filter.reset()
+    #     self.data.qpos[:] = saved_qpos
+    #     self.data.qvel[:] = saved_qvel
+    #     mujoco.mj_forward(self.model, self.data)
+    #     self.comp_filter.reset()
 
-        if self.frame_stack > 1:
-            stacked = np.zeros((n_coarse, _OBS_DIM * self.frame_stack), dtype=np.float32)
-            for i in range(n_coarse):
-                for k in range(self.frame_stack):
-                    # Match gym.wrappers.FrameStackObservation ordering: oldest
-                    # frame first, newest frame last.
-                    idx = (i - (self.frame_stack - 1 - k)) % n_coarse
-                    stacked[i, k * _OBS_DIM:(k + 1) * _OBS_DIM] = dataset[idx]
-            dataset = stacked
+    #     if self.frame_stack > 1:
+    #         stacked = np.zeros((n_coarse, _OBS_DIM * self.frame_stack), dtype=np.float32)
+    #         for i in range(n_coarse):
+    #             for k in range(self.frame_stack):
+    #                 # Match gym.wrappers.FrameStackObservation ordering: oldest
+    #                 # frame first, newest frame last.
+    #                 idx = (i - (self.frame_stack - 1 - k)) % n_coarse
+    #                 stacked[i, k * _OBS_DIM:(k + 1) * _OBS_DIM] = dataset[idx]
+    #         dataset = stacked
 
-        return dataset
+    #     return dataset
 
-    def sample_pairs(
-        self,
-        batch_size: int,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
+    # def sample_pairs(
+    #     self,
+    #     batch_size: int,
+    # ) -> tuple[torch.Tensor, torch.Tensor]:
+    #     """Sample consecutive state pairs (s_i, s_{i+1}) from the reference trajectory.
 
-        Returns:
-            Tuple of (s_i, s_next), each of shape (batch_size, *obs_shape).
-        """
-        n_ref = len(self._dataset)
-        inds = torch.randint(0, n_ref, (batch_size,))
-        s_i = torch.from_numpy(self._dataset[inds])
-        s_next = torch.from_numpy(self._dataset[(inds + 1) % n_ref])
-        return s_i, s_next
+    #     Returns:
+    #         Tuple of (s_i, s_next), each of shape (batch_size, *obs_shape).
+    #     """
+    #     n_ref = len(self._dataset)
+    #     inds = torch.randint(0, n_ref, (batch_size,))
+    #     s_i = torch.from_numpy(self._dataset[inds])
+    #     s_next = torch.from_numpy(self._dataset[(inds + 1) % n_ref])
+    #     return s_i, s_next
 
-    def get_reference(self) -> np.ndarray:
-        return self._dataset
+    # def get_reference(self) -> np.ndarray:
+    #     return self._dataset
